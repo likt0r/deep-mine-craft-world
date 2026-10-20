@@ -9,6 +9,7 @@ const { status, refresh, locked } = useServerStatus();
 
     <!-- Die Bereiche der Steuerung sind gesperrt, solange der Server nicht läuft. -->
     <fieldset :disabled="locked" class="flex flex-col gap-6" data-testid="controls">
+      <PlacesGrid />
       <PlayerPanel :players="status?.players ?? []" />
     </fieldset>
   </UContainer>
