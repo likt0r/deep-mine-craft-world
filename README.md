@@ -3,16 +3,19 @@
 Unser Minecraft-Server für PlayStation, Switch und iOS: der offizielle
 Bedrock Dedicated Server von Mojang, verwaltet über
 [Bedrock Server Manager (BSM)](https://github.com/DMedina559/bedrock-server-manager).
+Die Kinder steuern das Spiel über **Deep Mine Control**, eine Tablet-Oberfläche ohne Anmeldung.
 
 ## Überblick
 
 | Was | Wo |
 |---|---|
 | Server | Ubuntu 26.04 auf `192.168.0.110` |
-| Weboberfläche | https://192.168.0.110 (Caddy, selbst ausgestelltes Zertifikat) |
+| Deep Mine Control | http://192.168.0.110 (ohne Anmeldung, nur im LAN) |
+| BSM-Weboberfläche | https://192.168.0.110 (Caddy, selbst ausgestelltes Zertifikat) |
 | BSM | Dienst `bsm`, Benutzer `bsm`, Programm in `/opt/bsm/.venv`, lauscht nur auf `127.0.0.1:11325` |
 | Daten | `/var/lib/bsm/config` (Datenbank, Konten), `/var/lib/bsm/data` (Server, Welten, Backups) |
 | Bedrock-Server | in BSM `Bedrock`, Ordner `/var/lib/bsm/data/servers/Bedrock` |
+| Deep Mine Control | Dienst `deep-mine-control`, Benutzer `bsm`, Programm in `/opt/deep-mine-control`, lauscht nur auf `127.0.0.1:3000`, Daten in `/var/lib/bsm/deep-mine-control`, Passwort in `/etc/deep-mine-control.env` |
 
 Passwörter stehen nicht in diesem Repo.
 
@@ -37,9 +40,30 @@ In BSM beim Server `Bedrock`:
 
 BSM behält 3 Backups und 3 heruntergeladene Bedrock-Versionen, vor jedem Start wird gesichert.
 
+## Deep Mine Control
+
+Die Tablet-Oberfläche unter http://192.168.0.110: Spielmodus, Schwierigkeit, Zeit, Wetter,
+Spielregeln, „Alle zu einem Spieler holen“ und 10 Plätze für Welten (anlegen, laden, umbenennen, löschen).
+Begriffe stehen in [CONTEXT.md](CONTEXT.md), entwickelt wird in `control/` (siehe [AGENTS.md](AGENTS.md)).
+
+Deep Mine Control spricht mit BSM über ein eigenes BSM-Konto `deep-mine-control` (Rolle moderator reicht).
+Das Passwort steht nur in `/etc/deep-mine-control.env` als `NUXT_BSM_PASSWORD=…`.
+Konto neu anlegen: in BSM unter Benutzer einen Registrierungslink erzeugen, damit `deep-mine-control`
+registrieren, Passwort in die Datei schreiben, `sudo systemctl restart deep-mine-control`.
+
+## Aktualisieren
+
+Auf dem Laptop, nachdem die Änderungen auf GitHub sind:
+
+```sh
+./deploy.sh
+```
+
+Das holt auf dem Server den neuen Stand (`~/deep-mine-craft-world`, `git pull`) und führt `install.sh` aus.
+
 ## Neu installieren (z. B. auf neuer Festplatte)
 
-1. Ubuntu Server installieren, dieses Repo auf den Server holen.
+1. Ubuntu Server installieren, dieses Repo nach `~/deep-mine-craft-world` klonen.
 2. `sudo ./install.sh 192.168.0.110`
 3. Daten vom alten Server übernehmen. Damit bleiben Welten, Backups und die BSM-Konten erhalten:
    ```sh
@@ -54,6 +78,9 @@ BSM behält 3 Backups und 3 heruntergeladene Bedrock-Versionen, vor jedem Start 
    ```
    Ohne alte Daten: https://192.168.0.110 öffnen, Admin-Konto anlegen, Server `Bedrock` installieren
    und eine gesicherte Welt (`.mcworld`) unter „Content“ importieren.
+   Die Plätze von Deep Mine Control liegen in `/var/lib/bsm/deep-mine-control` und gehören mit ins Archiv:
+   `sudo tar -C /var/lib/bsm -czf bsm-daten.tar.gz config data deep-mine-control`.
+4. BSM-Konto für Deep Mine Control anlegen (siehe oben), falls `config` nicht übernommen wurde.
 
 ## Nützliche Konsolenbefehle (BSM → Konsole, ohne `/`)
 

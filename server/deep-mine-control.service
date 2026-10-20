@@ -1,0 +1,22 @@
+[Unit]
+Description=Deep Mine Control (Tablet-Oberfläche für den Minecraft-Server)
+After=network-online.target bsm.service
+Wants=network-online.target bsm.service
+
+[Service]
+Type=simple
+# Als bsm, weil Deep Mine Control Weltordner und Backups direkt anfasst.
+User=bsm
+Group=bsm
+WorkingDirectory=/var/lib/bsm/deep-mine-control
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3000
+# Enthält NUXT_BSM_PASSWORD für das BSM-Konto deep-mine-control.
+EnvironmentFile=/etc/deep-mine-control.env
+ExecStart=/usr/bin/node /opt/deep-mine-control/server/index.mjs
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
