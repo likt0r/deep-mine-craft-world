@@ -12,7 +12,9 @@ export default defineNuxtConfig({
     bsmBackupDir: "/var/lib/bsm/data/backups/Bedrock",
     dataDir: "/var/lib/bsm/deep-mine-control",
     /** Länge einer Countdown-Sekunde beim Weltwechsel. Tests setzen 0. */
-    countdownStepMs: 1000
+    countdownStepMs: 1000,
+    /** So lange wartet das Auslesen der Spielregeln auf die Ausgabe von `gamerule`. */
+    rulesWaitMs: 15000
   },
 
   devtools: { enabled: true },
