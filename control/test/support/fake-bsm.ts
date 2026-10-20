@@ -21,7 +21,10 @@ export interface FakeState {
   status: string;
   players: string[];
   properties: Record<string, string>;
-  /** Spielregeln, die auf `gamerule` ohne Argumente in die Server-Ausgabe geschrieben werden. */
+  /**
+   * Spielregeln, die auf `gamerule` ohne Argumente in die Server-Ausgabe geschrieben werden,
+   * mit Namen wie BDS sie ausgibt (camelCase). `null`: keine Ausgabe.
+   */
   gamerules: Record<string, string> | null;
   /** So lange bleibt der Server beim Start/Neustart in STARTING. */
   startDelayMs: number;
@@ -170,7 +173,12 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
           return bsmError(res, 409, "server_not_running", "Server is not running");
         if (command === "gamerule" && fake.state.gamerules) {
           const lines = Object.entries(fake.state.gamerules).map(([k, v]) => `${k} = ${v}`);
-          appendFileSync(fixture.outputFile, `[INFO] ${lines.join(", ")}\n`);
+          // Wie BDS 1.26: eine Zeile, Regelnamen in camelCase, z. B. "doDayLightCycle = true".
+          const stamp = new Date()
+            .toISOString()
+            .replace("T", " ")
+            .replace(/\.(\d+)Z$/, ":$1");
+          appendFileSync(fixture.outputFile, `[${stamp} INFO] ${lines.join(", ")}\n`);
         }
         return send(res, 200, {
           status: "success",

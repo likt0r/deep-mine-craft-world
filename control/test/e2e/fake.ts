@@ -1,6 +1,7 @@
 import type { FakeCall, FakeState } from "../support/fake-bsm";
+import { E2E_FAKE_PORT } from "./ports";
 
-const FAKE_URL = "http://127.0.0.1:3901";
+const FAKE_URL = `http://127.0.0.1:${E2E_FAKE_PORT}`;
 
 /** Steuert das Fake-BSM hinter der laufenden App aus Playwright-Tests heraus. */
 export const fake = {
