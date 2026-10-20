@@ -1,0 +1,20 @@
+[Unit]
+Description=Bedrock Server Manager
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bsm
+Group=bsm
+WorkingDirectory=/var/lib/bsm
+Environment=BSM_CONFIG_DIR=/var/lib/bsm/config
+Environment=BSM_DATA_DIR=/var/lib/bsm/data
+ExecStart=/opt/bsm/.venv/bin/bedrock-server-manager web start --mode direct --host 127.0.0.1 --port 11325
+Restart=on-failure
+RestartSec=10
+# BSM stoppt beim Herunterfahren die Bedrock-Server sauber und braucht dafür Zeit.
+TimeoutStopSec=180
+
+[Install]
+WantedBy=multi-user.target

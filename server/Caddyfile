@@ -1,0 +1,13 @@
+{
+	auto_https disable_redirects
+}
+
+# HOST_IP ersetzt install.sh durch die IP des Servers.
+https://HOST_IP, https://localhost {
+	tls internal
+	reverse_proxy 127.0.0.1:11325
+}
+
+http://HOST_IP {
+	redir https://HOST_IP{uri} permanent
+}
