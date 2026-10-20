@@ -1,5 +1,33 @@
 <script setup lang="ts">
 const { places, refresh } = usePlaces();
+const { data: status } = useNuxtData<Status>("status");
+const toast = useToast();
+
+/** Welt, die nach der Warnung geladen werden soll. */
+const pendingLoad = ref<Place | null>(null);
+const confirmOpen = computed({
+  get: () => pendingLoad.value !== null,
+  set: (open: boolean) => {
+    if (!open) pendingLoad.value = null;
+  }
+});
+
+/** Spielt gerade jemand, kommt erst die Warnung, sonst wird sofort geladen. */
+function requestLoad(entry: Place) {
+  if (status.value?.players.length) pendingLoad.value = entry;
+  else void loadWorld(entry);
+}
+
+async function loadWorld(entry: Place) {
+  pendingLoad.value = null;
+  try {
+    await $fetch(`/api/places/${entry.place}/load`, { method: "POST" });
+    // Der Status zeigt sofort „Welt wird gewechselt …“ und sperrt die Knöpfe.
+    await refreshNuxtData("status");
+  } catch {
+    toast.add({ title: "Das hat nicht geklappt. Versuch es nochmal.", color: "error", icon: "i-lucide-x" });
+  }
+}
 
 /** Platz, der gerade umbenannt wird, sonst null. */
 const renaming = ref<number | null>(null);
@@ -132,6 +160,17 @@ async function deleteWorld(place: number) {
               <UBadge color="neutral" variant="subtle">{{ worldTypeLabel(entry.world.type) }}</UBadge>
               <UBadge color="neutral" variant="subtle">{{ gameModeLabel(entry.world.mode) }}</UBadge>
             </div>
+            <UButton
+              v-if="!entry.active"
+              data-testid="place-load"
+              icon="i-lucide-play"
+              size="lg"
+              block
+              class="mt-auto"
+              @click="requestLoad(entry)"
+            >
+              Laden
+            </UButton>
           </template>
           <form v-else class="flex flex-col gap-2" @submit.prevent="save">
             <UInput
@@ -183,6 +222,13 @@ async function deleteWorld(place: number) {
         <p v-else class="text-muted">Frei</p>
       </div>
     </div>
+
+    <WorldSwitchConfirm
+      v-model:open="confirmOpen"
+      :worldName="pendingLoad?.world?.name ?? ''"
+      :players="status?.players ?? []"
+      @confirm="pendingLoad && loadWorld(pendingLoad)"
+    />
   </section>
 </template>
 

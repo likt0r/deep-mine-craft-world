@@ -9,7 +9,7 @@ import { DEFAULT_LEVEL_NAME, type ServerFixture } from "./fixture";
  * mit denselben Formen wie BSM 4.0.1, und schreibt jeden angenommenen Aufruf mit.
  *
  * Steuerung von außen (für Playwright): GET/POST /__fake/state, POST /__fake/reset,
- * POST /__fake/expire-tokens.
+ * POST /__fake/expire-tokens, POST /__fake/seed-place ({ place, world }, siehe ServerFixture.seedPlace).
  */
 
 export const FAKE_USER = "deep-mine-control";
@@ -125,6 +125,11 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
     }
     if (path === "/__fake/reset") {
       fake.reset();
+      return send(res, 200, {});
+    }
+    if (path === "/__fake/seed-place") {
+      const { place, world } = JSON.parse(raw);
+      fixture.seedPlace(place, world);
       return send(res, 200, {});
     }
     if (path === "/__fake/expire-tokens") {

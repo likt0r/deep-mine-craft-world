@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -13,6 +13,8 @@ export interface ServerFixture {
   /** Alles leeren und mit einer einzigen Welt neu anlegen. */
   reset(levelName?: string): void;
   addWorld(folder: string): void;
+  /** Legt eine Welt direkt auf einen Platz (Plätze-Datei und Weltordner), ohne die App. */
+  seedPlace(place: number, world: Partial<WorldInfo> & { folder: string }): void;
   remove(): void;
 }
 
@@ -38,6 +40,30 @@ export function createServerFixture(root = mkdtempSync(join(tmpdir(), "dmc-"))):
     addWorld(folder) {
       mkdirSync(join(fixture.worldsDir, folder, "db"), { recursive: true });
       writeFileSync(join(fixture.worldsDir, folder, "levelname.txt"), folder);
+    },
+    seedPlace(place, world) {
+      const file = join(fixture.dataDir, "places.json");
+      const stored: { place: number; world: WorldInfo }[] = existsSync(file)
+        ? JSON.parse(readFileSync(file, "utf8"))
+        : [];
+      const entry: WorldInfo = {
+        name: world.folder,
+        type: "normal",
+        mode: "creative",
+        difficulty: "normal",
+        createdAt: "2026-10-20T20:00:00.000Z",
+        ...world
+      };
+      const next = [...stored.filter((e) => e.place !== place), { place, world: entry }];
+      writeFileSync(
+        file,
+        JSON.stringify(
+          next.sort((a, b) => a.place - b.place),
+          null,
+          2
+        )
+      );
+      fixture.addWorld(world.folder);
     },
     remove() {
       rmSync(root, { recursive: true, force: true });
