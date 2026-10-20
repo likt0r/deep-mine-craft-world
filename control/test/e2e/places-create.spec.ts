@@ -60,3 +60,21 @@ test("spielt gerade jemand, warnt das Modal und nennt die Spieler", async ({ pag
 
   await expect(page.getByTestId("new-world-players-warning")).toContainText("Gerade spielen: Lena");
 });
+
+test("nach dem Anlegen sind die Spielregeln bekannt, auch wenn der Server langsam hochfährt", async ({
+  page
+}) => {
+  // Wie auf dem echten Server: BSM meldet schnell „läuft“, Bedrock antwortet erst später.
+  await fake.set({ startDelayMs: 500, outputDelayMs: 2000, gamerules: { keepInventory: "true" } });
+  await page.goto("/");
+
+  await page.getByTestId("place-2").getByTestId("place-create").click();
+  await page.getByTestId("new-world-name").fill("Bauwelt");
+  await page.getByTestId("new-world-submit").click();
+
+  await expect(page.getByTestId("active-world")).toHaveText("Bauwelt", { timeout: 10_000 });
+  await expect(page.getByTestId("rule-keepinventory")).toHaveAttribute("aria-checked", "true", {
+    timeout: 10_000
+  });
+  await expect(page.getByTestId("rule-keepinventory-unknown")).toHaveCount(0);
+});

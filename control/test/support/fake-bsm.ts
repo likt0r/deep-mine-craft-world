@@ -1,4 +1,4 @@
-import { appendFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 
@@ -30,6 +30,11 @@ export interface FakeState {
   startDelayMs: number;
   /** So lange braucht properties/get. Hält einen Weltvorgang offen, der die Properties liest. */
   propertiesDelayMs: number;
+  /**
+   * So spät erscheint die Ausgabe von `gamerule`. Wie bei BDS, das Befehle nach dem Start
+   * erst abarbeitet, wenn es fertig geladen hat (BSM meldet da schon RUNNING).
+   */
+  outputDelayMs: number;
 }
 
 export interface FakeCall {
@@ -62,7 +67,8 @@ function initialState(): FakeState {
     },
     gamerules: null,
     startDelayMs: 0,
-    propertiesDelayMs: 0
+    propertiesDelayMs: 0,
+    outputDelayMs: 0
   };
 }
 
@@ -106,6 +112,8 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
   };
 
   async function boot() {
+    // Wie BSM: Bei jedem Start beginnt die Ausgabedatei neu.
+    writeFileSync(fixture.outputFile, "");
     fake.state.status = "STARTING";
     await sleep(fake.state.startDelayMs);
     fake.state.status = "RUNNING";
@@ -185,11 +193,15 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
         if (command === "gamerule" && fake.state.gamerules) {
           const lines = Object.entries(fake.state.gamerules).map(([k, v]) => `${k} = ${v}`);
           // Wie BDS 1.26: eine Zeile, Regelnamen in camelCase, z. B. "doDayLightCycle = true".
-          const stamp = new Date()
-            .toISOString()
-            .replace("T", " ")
-            .replace(/\.(\d+)Z$/, ":$1");
-          appendFileSync(fixture.outputFile, `[${stamp} INFO] ${lines.join(", ")}\n`);
+          const write = () => {
+            const stamp = new Date()
+              .toISOString()
+              .replace("T", " ")
+              .replace(/\.(\d+)Z$/, ":$1");
+            appendFileSync(fixture.outputFile, `[${stamp} INFO] ${lines.join(", ")}\n`);
+          };
+          if (fake.state.outputDelayMs > 0) setTimeout(write, fake.state.outputDelayMs);
+          else write();
         }
         return send(res, 200, {
           status: "success",

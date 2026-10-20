@@ -4,11 +4,19 @@ type Rule = (typeof RULES)[number];
 const rules = ref<Rules | null>(null);
 const busy = ref<RuleName | null>(null);
 
-async function load() {
+/** Kommen alle Regeln unbekannt zurück, startet der Server vielleicht gerade noch: später nachfragen. */
+const RETRIES = 3;
+const RETRY_MS = 5000;
+let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
+async function load(attempt = 0) {
   rules.value = await $fetch<Rules>("/api/rules");
+  const allUnknown = Object.values(rules.value).every((value) => value === null);
+  if (allUnknown && attempt < RETRIES) retryTimer = setTimeout(() => load(attempt + 1), RETRY_MS);
 }
 
 onMounted(() => load());
+onBeforeUnmount(() => clearTimeout(retryTimer));
 
 /** Anzeige: invertierte Regeln zeigen den Schalterzustand, nicht den Regelwert. */
 function isOn(rule: Rule): boolean {

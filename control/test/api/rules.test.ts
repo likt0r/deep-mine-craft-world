@@ -1,4 +1,4 @@
-import { appendFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -49,6 +49,28 @@ describe("GET /api/rules", () => {
     const res = await h.request("/api/rules");
 
     expect(res.body.keepinventory).toBe(false);
+  });
+
+  it("wartet, wenn der Server nach einem Neustart noch lädt und gamerule später beantwortet", async () => {
+    h.fake.state.gamerules = { keepInventory: "true", pvp: "false" };
+    h.fake.state.outputDelayMs = 2500;
+
+    const res = await h.request("/api/rules");
+
+    expect(res.body).toMatchObject({ keepinventory: true, pvp: false });
+  });
+
+  it("liest die neu begonnene Ausgabedatei nach einem Neustart von vorn", async () => {
+    appendFileSync(h.fixture.outputFile, "[INFO] alte Zeile\n".repeat(500));
+    h.fake.state.gamerules = { keepInventory: "true" };
+    h.fake.state.outputDelayMs = 500;
+
+    const pending = h.request("/api/rules");
+    // Neustart während des Wartens: die Ausgabedatei beginnt neu.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    writeFileSync(h.fixture.outputFile, "");
+
+    expect((await pending).body.keepinventory).toBe(true);
   });
 
   it("ohne passende Ausgabe kommen alle Regeln als unbekannt zurück", async () => {
