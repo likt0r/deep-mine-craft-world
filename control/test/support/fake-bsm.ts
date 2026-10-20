@@ -6,7 +6,7 @@ import { DEFAULT_LEVEL_NAME, type ServerFixture } from "./fixture";
 
 /**
  * Nachgebautes BSM für Tests. Beantwortet nur die Routen, die Deep Mine Control nutzt,
- * mit denselben Formen wie BSM 4.0.1, und schreibt jeden Aufruf mit.
+ * mit denselben Formen wie BSM 4.0.1, und schreibt jeden angenommenen Aufruf mit.
  *
  * Steuerung von außen (für Playwright): GET/POST /__fake/state, POST /__fake/reset,
  * POST /__fake/expire-tokens.
@@ -131,10 +131,10 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
 
     let body: unknown = raw;
     if (req.headers["content-type"]?.includes("application/json")) body = JSON.parse(raw || "null");
-    fake.calls.push({ method: req.method ?? "GET", path, body });
 
     // --- Anmeldung ---
     if (path === "/auth/token" && req.method === "POST") {
+      fake.calls.push({ method: req.method ?? "GET", path, body });
       const form = new URLSearchParams(raw);
       if (form.get("username") !== FAKE_USER || form.get("password") !== FAKE_PASSWORD) {
         return bsmError(res, 401, "unauthorized", "Incorrect username or password");
@@ -147,6 +147,9 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
     const auth = req.headers.authorization ?? "";
     if (!tokens.has(auth.replace(/^Bearer /, "")))
       return bsmError(res, 401, "unauthorized", "Not authenticated");
+
+    // Abgewiesene Anfragen erreichen BSM nicht und werden deshalb nicht mitgeschrieben.
+    fake.calls.push({ method: req.method ?? "GET", path, body });
 
     const prefix = `/api/server/${SERVER}/`;
     if (!path.startsWith(prefix)) return bsmError(res, 404, "not_found", "Not Found");
