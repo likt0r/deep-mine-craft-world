@@ -109,6 +109,8 @@ async function deleteWorld(place: number) {
               title="Welt löschen: 3 Sekunden gedrückt halten"
               aria-label="Welt löschen"
               :disabled="entry.active || deleting === entry.place"
+              class="hold-button"
+              @contextmenu.prevent
               @pointerdown="startHold(entry)"
               @pointerup="cancelHold"
               @pointerleave="cancelHold"
@@ -192,6 +194,14 @@ async function deleteWorld(place: number) {
   to {
     width: 100%;
   }
+}
+
+/* Langes Drücken auf Tablets soll kein Kontextmenü und keine Textauswahl auslösen. */
+.hold-button {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 /* Füllt sich in HOLD_MS und zeigt an, wie lange der Knopf schon gehalten wird. */
