@@ -28,6 +28,8 @@ export interface FakeState {
   gamerules: Record<string, string> | null;
   /** So lange bleibt der Server beim Start/Neustart in STARTING. */
   startDelayMs: number;
+  /** So lange braucht properties/get. Hält einen Weltvorgang offen, der die Properties liest. */
+  propertiesDelayMs: number;
 }
 
 export interface FakeCall {
@@ -59,7 +61,8 @@ function initialState(): FakeState {
       "level-seed": ""
     },
     gamerules: null,
-    startDelayMs: 0
+    startDelayMs: 0,
+    propertiesDelayMs: 0
   };
 }
 
@@ -190,6 +193,7 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
         });
       }
       case "GET properties/get":
+        await sleep(fake.state.propertiesDelayMs);
         return send(res, 200, { status: "success", properties: fake.state.properties });
       case "POST properties/set": {
         const properties = (body as { properties?: Record<string, string> } | null)?.properties;

@@ -7,6 +7,16 @@ const name = ref("");
 const saving = ref(false);
 const failed = ref(false);
 
+/** So lange muss der Löschknopf gehalten werden, damit die Welt wirklich gelöscht wird. */
+const HOLD_MS = 3000;
+/** Platz, auf dem gerade der Löschknopf gehalten wird. */
+const holding = ref<number | null>(null);
+/** Platz, dessen Löschen gerade läuft. */
+const deleting = ref<number | null>(null);
+/** Platz, bei dem das Löschen fehlgeschlagen ist. */
+const deleteFailed = ref<number | null>(null);
+let holdTimer: ReturnType<typeof setTimeout> | undefined;
+
 function startRename(entry: Place) {
   renaming.value = entry.place;
   name.value = entry.world?.name ?? "";
@@ -31,6 +41,35 @@ async function save() {
     failed.value = true;
   } finally {
     saving.value = false;
+  }
+}
+
+/** Löschen beginnt erst nach 3 Sekunden Halten. Loslassen bricht ab. */
+function startHold(entry: Place) {
+  if (entry.active || deleting.value !== null) return;
+  deleteFailed.value = null;
+  holding.value = entry.place;
+  holdTimer = setTimeout(() => {
+    holding.value = null;
+    void deleteWorld(entry.place);
+  }, HOLD_MS);
+}
+
+function cancelHold() {
+  clearTimeout(holdTimer);
+  holding.value = null;
+}
+
+async function deleteWorld(place: number) {
+  deleting.value = place;
+  try {
+    await $fetch(`/api/places/${place}`, { method: "DELETE" });
+    // Der Platz ist wieder frei.
+    await refresh();
+  } catch {
+    deleteFailed.value = place;
+  } finally {
+    deleting.value = null;
   }
 }
 </script>
@@ -60,7 +99,29 @@ async function save() {
               aria-label="Welt umbenennen"
               @click="startRename(entry)"
             />
+            <UButton
+              v-if="entry.world"
+              data-testid="place-delete"
+              icon="i-lucide-trash-2"
+              color="error"
+              variant="ghost"
+              size="md"
+              title="Welt löschen: 3 Sekunden gedrückt halten"
+              aria-label="Welt löschen"
+              :disabled="entry.active || deleting === entry.place"
+              @pointerdown="startHold(entry)"
+              @pointerup="cancelHold"
+              @pointerleave="cancelHold"
+              @pointercancel="cancelHold"
+            />
           </div>
+        </div>
+        <div
+          v-if="holding === entry.place"
+          class="h-1.5 overflow-hidden rounded-full bg-error/20"
+          data-testid="place-delete-progress"
+        >
+          <div class="hold-fill h-full rounded-full bg-error" />
         </div>
         <template v-if="entry.world">
           <template v-if="renaming !== entry.place">
@@ -108,9 +169,33 @@ async function save() {
               data-testid="place-rename-error"
             />
           </form>
+          <UAlert
+            v-if="deleteFailed === entry.place"
+            color="error"
+            variant="subtle"
+            icon="i-lucide-x"
+            description="Das hat nicht geklappt. Versuch es nochmal."
+            data-testid="place-delete-error"
+          />
         </template>
         <p v-else class="text-muted">Frei</p>
       </div>
     </div>
   </section>
 </template>
+
+<style scoped>
+@keyframes delete-hold {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+/* Füllt sich in HOLD_MS und zeigt an, wie lange der Knopf schon gehalten wird. */
+.hold-fill {
+  animation: delete-hold 3s linear forwards;
+}
+</style>
