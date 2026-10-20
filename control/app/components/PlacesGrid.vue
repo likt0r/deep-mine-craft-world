@@ -56,7 +56,7 @@ async function save() {
               icon="i-lucide-pencil"
               color="neutral"
               variant="ghost"
-              size="xs"
+              size="md"
               aria-label="Welt umbenennen"
               @click="startRename(entry)"
             />

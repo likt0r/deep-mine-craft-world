@@ -61,7 +61,9 @@ test("Welt umbenennen: Stift-Symbol, neuer Name steht sofort auf der Kachel", as
   // Nur der Name hat sich geändert: kein Neustart und kein Befehl.
   const state = await fake.get();
   expect(state.properties["level-name"]).toBe("Pandaland");
-  expect(state.calls.some((c) => /\/(start|restart|send_command)$/.test(c.path))).toBe(false);
+  expect(state.calls.some((c) => /\/(start|restart|properties\/set)$/.test(c.path))).toBe(false);
+  // Die Spielregeln auf derselben Seite schicken `gamerule`, das zählt hier nicht.
+  expect((await fake.commands()).filter((c) => c !== "gamerule")).toEqual([]);
 });
 
 test("leerer Name wird abgelehnt, der alte Name bleibt stehen", async ({ page }) => {
