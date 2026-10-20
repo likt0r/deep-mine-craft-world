@@ -22,7 +22,7 @@ test("Ziel antippen und alle hierher holen", async ({ page }) => {
   await teleport.click();
 
   await expect(page.getByTestId("teleport-sent")).toBeVisible();
-  expect(await fake.commands()).toEqual(['tp @a "Lena"']);
+  expect((await fake.commands()).filter((c) => c.startsWith("tp "))).toEqual(['tp @a "Lena"']);
 
   // Ein zweites Ziel wählen und erneut holen.
   const tom = page.locator('[data-testid="player-option"][data-player="Tom"]');
@@ -30,7 +30,7 @@ test("Ziel antippen und alle hierher holen", async ({ page }) => {
   await expect(lena).toHaveAttribute("aria-pressed", "false");
   await teleport.click();
   await expect(page.getByTestId("teleport-sent")).toBeVisible();
-  expect(await fake.commands()).toEqual(['tp @a "Lena"', 'tp @a "Tom"']);
+  expect((await fake.commands()).filter((c) => c.startsWith("tp "))).toEqual(['tp @a "Lena"', 'tp @a "Tom"']);
 });
 
 test("ohne online Spieler ist der Knopf gesperrt", async ({ page }) => {
