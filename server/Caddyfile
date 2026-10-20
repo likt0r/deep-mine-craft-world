@@ -3,11 +3,14 @@
 }
 
 # HOST_IP ersetzt install.sh durch die IP des Servers.
+
+# BSM (Admin, mit Anmeldung)
 https://HOST_IP, https://localhost {
 	tls internal
 	reverse_proxy 127.0.0.1:11325
 }
 
+# Deep Mine Control (Tablet, ohne Anmeldung, nur im LAN)
 http://HOST_IP {
-	redir https://HOST_IP{uri} permanent
+	reverse_proxy 127.0.0.1:3000
 }

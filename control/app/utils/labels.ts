@@ -1,0 +1,31 @@
+/** Übersetzungen der Werte aus `server.properties` für die Anzeige. Unbekannte Werte bleiben stehen. */
+
+const GAME_MODES: Record<string, string> = {
+  survival: "Überleben",
+  creative: "Kreativ",
+  adventure: "Abenteuer"
+};
+
+const WORLD_TYPES: Record<string, string> = {
+  normal: "Normal",
+  flach: "Flach"
+};
+
+const DIFFICULTIES: Record<string, string> = {
+  peaceful: "Friedlich",
+  easy: "Leicht",
+  normal: "Normal",
+  hard: "Schwer"
+};
+
+export function gameModeLabel(mode: string): string {
+  return GAME_MODES[mode] ?? mode;
+}
+
+export function worldTypeLabel(type: string): string {
+  return WORLD_TYPES[type] ?? type;
+}
+
+export function difficultyLabel(difficulty: string): string {
+  return DIFFICULTIES[difficulty] ?? difficulty;
+}
