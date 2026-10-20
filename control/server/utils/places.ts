@@ -46,6 +46,24 @@ function migrate(properties: Record<string, string>): StoredPlace[] {
   return stored;
 }
 
+/** Prüft, ob die Nummer zu den 10 Plätzen gehört. */
+export function isPlace(place: number): boolean {
+  return ALL_PLACES.includes(place);
+}
+
+/**
+ * Ändert nur den Anzeigename der Welt auf einem Platz: kein BSM-Aufruf, kein Neustart.
+ * Liefert false, wenn der Platz leer ist oder noch keine Plätze-Datei existiert.
+ */
+export function renamePlace(place: number, name: string): boolean {
+  const stored = readStored();
+  const entry = stored?.find((item) => item.place === place);
+  if (!stored || !entry) return false;
+  entry.world.name = name;
+  writeStored(stored);
+  return true;
+}
+
 /** Die 10 Plätze. Aktiv ist die Welt, deren Ordner dem aktuellen `level-name` entspricht. */
 export async function getPlaces(properties?: Record<string, string>): Promise<Place[]> {
   properties ??= await bsm.getProperties();
