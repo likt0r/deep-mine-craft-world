@@ -33,7 +33,8 @@ export async function startApp(fake: FakeBsm, fixture: ServerFixture, port?: num
       NUXT_BSM_PASSWORD: FAKE_PASSWORD,
       NUXT_BSM_SERVER_DIR: fixture.serverDir,
       NUXT_BSM_BACKUP_DIR: fixture.backupDir,
-      NUXT_DATA_DIR: fixture.dataDir
+      NUXT_DATA_DIR: fixture.dataDir,
+      NUXT_COUNTDOWN_STEP_MS: "0"
     },
     stdio: ["ignore", "inherit", "inherit"]
   });

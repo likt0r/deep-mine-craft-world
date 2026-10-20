@@ -145,6 +145,17 @@ describe("PATCH /api/places/{n}", () => {
     expect(places.body.places[0].world.name).toBe("Pandaland");
   });
 
+  it.each(["Panda\nstop", "Panda\rland", "Panda\tland"])(
+    "lehnt den Namen %j mit Steuerzeichen ab (er landet in Chat-Befehlen)",
+    async (name) => {
+      await migrate();
+
+      const res = await h.request("/api/places/1", { method: "PATCH", body: { name } });
+
+      expect(res.status).toBe(400);
+    }
+  );
+
   it("lehnt einen Namen ab, der zu lang ist", async () => {
     await migrate();
 

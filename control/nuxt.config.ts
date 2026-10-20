@@ -10,7 +10,9 @@ export default defineNuxtConfig({
     bsmServer: "Bedrock",
     bsmServerDir: "/var/lib/bsm/data/servers/Bedrock",
     bsmBackupDir: "/var/lib/bsm/data/backups/Bedrock",
-    dataDir: "/var/lib/bsm/deep-mine-control"
+    dataDir: "/var/lib/bsm/deep-mine-control",
+    /** Länge einer Countdown-Sekunde beim Weltwechsel. Tests setzen 0. */
+    countdownStepMs: 1000
   },
 
   devtools: { enabled: true },

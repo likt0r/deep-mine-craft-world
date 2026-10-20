@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const renameRequest = z.object({
   /** Nur der Anzeigename ändert sich, nicht der Weltordner. */
-  name: z.string().trim().min(1).max(WORLD_NAME_MAX)
+  name: z.string().trim().refine(isValidWorldName)
 });
 
 export default defineEventHandler(async (event) => {

@@ -6,6 +6,6 @@ export default defineEventHandler(async (): Promise<Status> => {
     // Anzeigename der aktiven Welt; liegt sie auf keinem Platz, der Ordnername.
     world: places.find((p) => p.active)?.world?.name ?? properties["level-name"] ?? "",
     players: summary.players.map((p) => p.name),
-    busy: false
+    busy: isWorldOperationRunning()
   };
 });

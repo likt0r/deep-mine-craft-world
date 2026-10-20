@@ -46,6 +46,20 @@ function migrate(properties: Record<string, string>): StoredPlace[] {
   return stored;
 }
 
+/** Die Welt auf einem Platz, `null` wenn er leer ist. */
+export function getStoredWorld(place: number): WorldInfo | null {
+  return readStored()?.find((entry) => entry.place === place)?.world ?? null;
+}
+
+/** Legt eine Welt auf einen Platz oder macht ihn mit `null` frei. */
+export async function setStoredWorld(place: number, world: WorldInfo | null): Promise<void> {
+  const current = readStored() ?? migrate(await bsm.getProperties());
+  const stored = current.filter((entry) => entry.place !== place);
+  if (world) stored.push({ place, world });
+  stored.sort((a, b) => a.place - b.place);
+  writeStored(stored);
+}
+
 /** Prüft, ob die Nummer zu den 10 Plätzen gehört. */
 export function isPlace(place: number): boolean {
   return ALL_PLACES.includes(place);
