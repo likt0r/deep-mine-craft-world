@@ -9,5 +9,10 @@ export const fake = {
   set: (state: Partial<FakeState>) =>
     fetch(`${FAKE_URL}/__fake/state`, { method: "POST", body: JSON.stringify(state) }),
   get: async () =>
-    (await (await fetch(`${FAKE_URL}/__fake/state`)).json()) as FakeState & { calls: FakeCall[] }
+    (await (await fetch(`${FAKE_URL}/__fake/state`)).json()) as FakeState & { calls: FakeCall[] },
+  /** Bisher gesendete Konsolenbefehle, in Reihenfolge. */
+  commands: async () =>
+    (await fake.get()).calls
+      .filter((c) => c.path.endsWith("/send_command"))
+      .map((c) => (c.body as { command: string }).command)
 };

@@ -8,6 +8,8 @@ const { status, refresh, locked } = useServerStatus();
     <ServerOffBanner v-if="status?.state === 'stopped'" @started="refresh()" />
 
     <!-- Die Bereiche der Steuerung sind gesperrt, solange der Server nicht läuft. -->
-    <fieldset :disabled="locked" class="flex flex-col gap-6" data-testid="controls" />
+    <fieldset :disabled="locked" class="flex flex-col gap-6" data-testid="controls">
+      <PlayerPanel :players="status?.players ?? []" />
+    </fieldset>
   </UContainer>
 </template>
