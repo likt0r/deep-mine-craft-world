@@ -1,9 +1,12 @@
-/** Serverstatus für die ganze Seite, wird alle 3 s neu geladen. */
+/** Serverstatus für die ganze Seite. Lädt alle 3 s Status und Plätze neu. Nur einmal pro Seite aufrufen. */
 export function useServerStatus() {
   const { data, refresh, error } = useFetch<Status>("/api/status", { key: "status" });
 
   onMounted(() => {
-    const timer = setInterval(() => refresh(), 3000);
+    const timer = setInterval(() => {
+      refresh();
+      refreshNuxtData("places");
+    }, 3000);
     onBeforeUnmount(() => clearInterval(timer));
   });
 

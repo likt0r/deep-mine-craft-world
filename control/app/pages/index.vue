@@ -10,6 +10,8 @@ const { status, refresh, locked } = useServerStatus();
     <!-- Die Bereiche der Steuerung sind gesperrt, solange der Server nicht läuft. -->
     <fieldset :disabled="locked" class="flex flex-col gap-6" data-testid="controls">
       <PlacesGrid />
+      <GameModePanel />
+      <DifficultyPanel />
       <TimeWeather />
       <!-- Neu laden, wenn eine andere Welt aktiv wird oder der Server wieder läuft. -->
       <GameRules :key="`${status?.world}:${status?.state}`" />

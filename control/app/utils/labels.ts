@@ -11,10 +11,21 @@ const WORLD_TYPES: Record<string, string> = {
   flach: "Flach"
 };
 
+const DIFFICULTIES: Record<string, string> = {
+  peaceful: "Friedlich",
+  easy: "Leicht",
+  normal: "Normal",
+  hard: "Schwer"
+};
+
 export function gameModeLabel(mode: string): string {
   return GAME_MODES[mode] ?? mode;
 }
 
 export function worldTypeLabel(type: string): string {
   return WORLD_TYPES[type] ?? type;
+}
+
+export function difficultyLabel(difficulty: string): string {
+  return DIFFICULTIES[difficulty] ?? difficulty;
 }

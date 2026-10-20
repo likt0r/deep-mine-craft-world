@@ -56,3 +56,22 @@ export async function getPlaces(properties?: Record<string, string>): Promise<Pl
     return { place, world, active: world !== null && world.folder === levelName };
   });
 }
+
+/** Aktualisiert Modus oder Schwierigkeit der aktiven Welt in der Plätze-Datei. */
+export async function updateActiveWorld(update: Partial<Pick<WorldInfo, "mode" | "difficulty">>) {
+  const properties = await bsm.getProperties();
+  const levelName = properties["level-name"] ?? "";
+  const stored = readStored() ?? migrate(properties);
+  const placeIndex = stored.findIndex((entry) => entry.world.folder === levelName);
+  if (placeIndex === -1) return;
+  const current = stored[placeIndex];
+  if (!current) return;
+  stored[placeIndex] = {
+    place: current.place,
+    world: {
+      ...current.world,
+      ...update
+    }
+  };
+  writeStored(stored);
+}
