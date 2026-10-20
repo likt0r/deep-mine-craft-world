@@ -47,8 +47,8 @@ function migrate(properties: Record<string, string>): StoredPlace[] {
 }
 
 /** Die 10 Plätze. Aktiv ist die Welt, deren Ordner dem aktuellen `level-name` entspricht. */
-export async function getPlaces(): Promise<Place[]> {
-  const properties = await bsm.getProperties();
+export async function getPlaces(properties?: Record<string, string>): Promise<Place[]> {
+  properties ??= await bsm.getProperties();
   const stored = readStored() ?? migrate(properties);
   const levelName = properties["level-name"] ?? "";
   return ALL_PLACES.map((place) => {

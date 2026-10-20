@@ -18,10 +18,19 @@ describe("GET /api/status", () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
       state: "running",
-      world: "Bedrock level",
+      world: "Pandaland",
       players: ["Lena", "Tom"],
       busy: false
     });
+  });
+
+  it("nennt den Ordnernamen, wenn die aktive Welt auf keinem Platz liegt", async () => {
+    await h.request("/api/status");
+    h.fake.state.properties["level-name"] = "Andere Welt";
+
+    const res = await h.request("/api/status");
+
+    expect(res.body.world).toBe("Andere Welt");
   });
 
   it.each([

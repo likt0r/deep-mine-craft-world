@@ -10,7 +10,7 @@ test("zeigt aktive Welt, Status und Spielerzahl", async ({ page }) => {
   await fake.set({ players: ["Lena"] });
   await page.goto("/");
 
-  await expect(page.getByTestId("active-world")).toHaveText("Bedrock level");
+  await expect(page.getByTestId("active-world")).toHaveText("Pandaland");
   await expect(page.getByTestId("server-state")).toHaveText("Läuft");
   await expect(page.getByTestId("player-count")).toContainText("1 online");
   await expect(page.getByTestId("server-off")).toBeHidden();

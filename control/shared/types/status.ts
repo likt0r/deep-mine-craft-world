@@ -3,7 +3,7 @@ export type ServerState = "running" | "starting" | "stopped";
 
 export interface Status {
   state: ServerState;
-  /** Name der aktiven Welt */
+  /** Anzeigename der aktiven Welt */
   world: string;
   /** Online-Spieler (Gamertags) */
   players: string[];
