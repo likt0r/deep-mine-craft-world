@@ -18,6 +18,11 @@ function requestLoad(entry: Place) {
   else void loadWorld(entry);
 }
 
+/** Die neue Welt wird gleich geladen: Status und Plätze sofort neu holen. */
+async function onCreated() {
+  await Promise.all([refresh(), refreshNuxtData("status")]);
+}
+
 async function loadWorld(entry: Place) {
   pendingLoad.value = null;
   try {
@@ -44,6 +49,15 @@ const deleting = ref<number | null>(null);
 /** Platz, bei dem das Löschen fehlgeschlagen ist. */
 const deleteFailed = ref<number | null>(null);
 let holdTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Freier Platz, für den das „Neue Welt“-Modal offen ist, sonst null. */
+const creating = ref<number | null>(null);
+const createOpen = computed({
+  get: () => creating.value !== null,
+  set: (value: boolean) => {
+    if (!value) creating.value = null;
+  }
+});
 
 function startRename(entry: Place) {
   renaming.value = entry.place;
@@ -219,7 +233,20 @@ async function deleteWorld(place: number) {
             data-testid="place-delete-error"
           />
         </template>
-        <p v-else class="text-muted">Frei</p>
+        <template v-else>
+          <p class="text-muted">Frei</p>
+          <UButton
+            data-testid="place-create"
+            icon="i-lucide-plus"
+            color="neutral"
+            variant="soft"
+            size="lg"
+            block
+            @click="creating = entry.place"
+          >
+            Neue Welt
+          </UButton>
+        </template>
       </div>
     </div>
 
@@ -228,6 +255,14 @@ async function deleteWorld(place: number) {
       :worldName="pendingLoad?.world?.name ?? ''"
       :players="status?.players ?? []"
       @confirm="pendingLoad && loadWorld(pendingLoad)"
+    />
+
+    <!-- Das Anlegen lädt die neue Welt, deshalb kommen die Plätze danach neu. -->
+    <NewWorldModal
+      v-if="creating !== null"
+      v-model:open="createOpen"
+      :place="creating"
+      @created="onCreated"
     />
   </section>
 </template>
