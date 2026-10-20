@@ -14,6 +14,9 @@ BUILD_USER="${SUDO_USER:-root}"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq python3-venv caddy curl nodejs npm
+# Das npm aus Ubuntu ist zu alt für unsere package-lock.json (npm 11).
+[ "$(npm -v | cut -d. -f1)" -ge 11 ] || npm install -g -q npm@11
+hash -r
 
 # --- BSM ---
 id bsm >/dev/null 2>&1 || useradd --system --shell /usr/sbin/nologin --home-dir /var/lib/bsm --create-home bsm
