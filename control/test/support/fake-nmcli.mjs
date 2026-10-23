@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Nachgebautes nmcli (und iw) für Tests. Versteht nur die Aufrufe von server/utils/wifi.ts,
-// mit derselben Ausgabe wie NetworkManager 1.5x. Zustand und Aufrufe stehen in $FAKE_NMCLI_STATE.
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+// mit derselben Ausgabe wie NetworkManager 1.5x. Der Zustand steht in $FAKE_NMCLI_STATE, jeder Aufruf
+// als eine JSON-Zeile in $FAKE_NMCLI_STATE.calls. Die API ruft nmcli gleichzeitig auf: Lesen schreibt
+// deshalb nichts, Ändern schreibt atomar (temporäre Datei, dann umbenennen).
+import { appendFileSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 import { initialState } from "./fake-nmcli-state.mjs";
 
@@ -11,8 +13,14 @@ const AP = "dmc-ap";
 
 const state = file && existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : initialState();
 const args = process.argv.slice(2);
-state.calls.push(args);
-const save = () => file && writeFileSync(file, JSON.stringify(state, null, 2));
+if (file) appendFileSync(`${file}.calls`, `${JSON.stringify(args)}\n`);
+/** Nur nach Änderungen speichern. */
+let changed = false;
+const save = () => {
+  if (!file || !changed) return;
+  writeFileSync(`${file}.${process.pid}.tmp`, JSON.stringify(state, null, 2));
+  renameSync(`${file}.${process.pid}.tmp`, file);
+};
 const fail = (code, message) => {
   save();
   process.stderr.write(`Error: ${message}\n`);
@@ -78,6 +86,7 @@ if (joined === `-t -f IN-USE,SSID,SIGNAL,SECURITY device wifi list ifname ${DEVI
 }
 
 if (args[0] === "connection" && args[1] === "add") {
+  changed = true;
   const p = pairs(2);
   state.connections.push({
     name: p["con-name"],
@@ -90,6 +99,7 @@ if (args[0] === "connection" && args[1] === "add") {
 }
 
 if (args[0] === "connection" && args[1] === "modify") {
+  changed = true;
   const c = find(args[2]);
   if (!c) fail(10, `${args[2]} - no such connection profile.`);
   const p = pairs(3);
@@ -99,6 +109,7 @@ if (args[0] === "connection" && args[1] === "modify") {
 }
 
 if (args[0] === "connection" && args[1] === "up") {
+  changed = true;
   const c = find(args[2]);
   if (!c) fail(10, `${args[2]} - no such connection profile.`);
   // Ist das WLAN nicht in Reichweite, scheitert es, und NetworkManager nimmt wieder das eigene WLAN.
@@ -111,6 +122,7 @@ if (args[0] === "connection" && args[1] === "up") {
 }
 
 if (args[0] === "connection" && args[1] === "delete") {
+  changed = true;
   if (!find(args[2])) fail(10, `${args[2]} - no such connection profile.`);
   state.connections = state.connections.filter((c) => c.name !== args[2]);
   if (state.active === args[2]) state.active = AP;

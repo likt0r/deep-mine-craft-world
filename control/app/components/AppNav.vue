@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// Markiert wird der ganze Bereich (router-link-active), damit System auch unter /system/wlan leuchtet.
 const AREAS = [
   { to: "/", label: "Spielen", icon: "i-lucide-gamepad-2" },
   { to: "/welten", label: "Welten", icon: "i-lucide-layers" },
@@ -20,7 +21,7 @@ const AREAS = [
       :key="area.to"
       :to="area.to"
       :data-testid="`nav-${area.label.toLowerCase()}`"
-      class="flex h-19 flex-col items-center justify-center gap-1 border-t-3 border-transparent font-pixel text-sm font-semibold text-muted transition-colors hover:text-default md:h-auto md:rounded-lg md:border-t-0 md:py-3 md:text-base aria-[current=page]:border-primary aria-[current=page]:text-primary md:aria-[current=page]:bg-primary/15"
+      class="flex h-19 flex-col items-center justify-center gap-1 border-t-3 border-transparent font-pixel text-sm font-semibold text-muted transition-colors hover:text-default md:h-auto md:rounded-lg md:border-t-0 md:py-3 md:text-base [&.router-link-active]:border-primary [&.router-link-active]:text-primary md:[&.router-link-active]:bg-primary/15"
     >
       <UIcon :name="area.icon" class="size-6" />
       {{ area.label }}

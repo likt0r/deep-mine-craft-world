@@ -58,6 +58,7 @@ export function createServerFixture(root = mkdtempSync(join(tmpdir(), "dmc-"))):
       fixture.addWorld(levelName);
       writeFileSync(fixture.outputFile, "");
       rmSync(fixture.nmcliState, { force: true });
+      rmSync(`${fixture.nmcliState}.calls`, { force: true });
     },
     addWorld(folder) {
       mkdirSync(join(fixture.worldsDir, folder, "db"), { recursive: true });

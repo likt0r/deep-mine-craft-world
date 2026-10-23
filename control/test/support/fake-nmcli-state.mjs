@@ -15,7 +15,6 @@ export function initialState() {
     ],
     stations: 2,
     /** NetworkManager läuft nicht: jeder Aufruf scheitert. */
-    broken: false,
-    calls: []
+    broken: false
   };
 }

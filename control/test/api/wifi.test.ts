@@ -21,8 +21,16 @@ const setNm = (change: (state: NmState) => void) => {
   change(state);
   writeFileSync(h.fixture.nmcliState, JSON.stringify(state));
 };
+/** Alle Aufrufe von nmcli, in Reihenfolge. */
+const calls = (): string[][] =>
+  existsSync(`${h.fixture.nmcliState}.calls`)
+    ? readFileSync(`${h.fixture.nmcliState}.calls`, "utf8")
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line))
+    : [];
 /** Aufrufe von nmcli, die etwas ändern (add, modify, up, delete). */
-const changes = () => nm().calls.filter((c: string[]) => c[0] === "connection" && c[1] !== "show");
+const changes = () => calls().filter((c) => c[0] === "connection" && c[1] !== "show");
 
 describe("GET /api/wifi", () => {
   it("eigenes WLAN aktiv: AP mit Passwort und Geräten, sichtbare WLANs ohne das eigene", async () => {
