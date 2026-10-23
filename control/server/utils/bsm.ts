@@ -69,6 +69,8 @@ export const bsm = {
   summary: () => bsmFetch<BsmSummary>(serverPath("summary")),
   start: () => bsmFetch(serverPath("start"), { method: "POST" }),
   restart: () => bsmFetch(serverPath("restart"), { method: "POST" }),
+  /** BSM antwortet erst, wenn der Server aus ist. */
+  stop: () => bsmFetch(serverPath("stop"), { method: "POST" }),
   sendCommand: (command: string) =>
     bsmFetch(serverPath("send_command"), { method: "POST", body: { command } }),
   getProperties: async () => (await bsmFetch<BsmProperties>(serverPath("properties/get"))).properties,

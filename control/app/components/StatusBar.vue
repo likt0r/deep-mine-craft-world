@@ -83,23 +83,26 @@ const view = computed<View>(() => {
   };
 });
 
+/** Text- und Randfarbe; der Farbton liegt als eigene Schicht über dem festen Grund. */
 const TONES = {
-  success: "bg-success/10 text-success border-success/25",
-  warning: "bg-warning/10 text-warning border-warning/30",
-  error: "bg-error/12 text-error border-error/30",
-  neutral: "bg-elevated text-toned border-default"
+  success: { text: "text-success border-success/25", tint: "bg-success/10" },
+  warning: { text: "text-warning border-warning/30", tint: "bg-warning/10" },
+  error: { text: "text-error border-error/30", tint: "bg-error/12" },
+  neutral: { text: "text-toned border-default", tint: "bg-elevated" }
 };
 </script>
 
 <template>
+  <!-- Fester Grund, damit beim Scrollen nichts durchscheint. -->
   <div
     role="status"
     data-testid="status-bar"
     :data-state="view.state"
-    class="sticky top-0 z-30 border-b backdrop-blur-sm"
-    :class="TONES[view.tone]"
+    class="sticky top-0 z-30 border-b bg-default"
+    :class="TONES[view.tone].text"
   >
-    <UContainer class="flex min-h-10 items-center gap-2 text-sm font-semibold">
+    <span aria-hidden="true" class="absolute inset-0" :class="TONES[view.tone].tint" />
+    <UContainer class="relative flex min-h-10 items-center gap-2 text-sm font-semibold">
       <UIcon
         v-if="view.icon"
         :name="view.icon"

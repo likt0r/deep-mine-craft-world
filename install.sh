@@ -40,6 +40,9 @@ if [ ! -f /etc/deep-mine-control.env ]; then
 fi
 install -m 644 "$HERE/server/deep-mine-control.service" /etc/systemd/system/deep-mine-control.service
 
+# Deep Mine Control (bsm) darf den Rechner neu starten und ausschalten (Bereich System)
+install -m 644 "$HERE/server/50-deep-mine-control.rules" /etc/polkit-1/rules.d/50-deep-mine-control.rules
+
 # SMART-Werte der Systemplatte für den Bereich System (smartctl braucht root)
 install -m 755 "$HERE/server/smart-status.sh" /usr/local/bin/deep-mine-smart-status
 install -m 644 "$HERE/server/deep-mine-smart.service" /etc/systemd/system/deep-mine-smart.service

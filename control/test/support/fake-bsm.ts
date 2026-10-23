@@ -186,6 +186,9 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
           player_count: fake.state.players.length,
           players: fake.state.players.map((name, i) => ({ name, xuid: String(1000 + i) }))
         });
+      case "POST stop":
+        fake.state.status = "STOPPED";
+        return send(res, 200, { status: "success", server_name: SERVER, message: "ok" });
       case "POST start":
       case "POST restart":
         await boot();

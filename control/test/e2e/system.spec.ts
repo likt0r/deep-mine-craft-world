@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,6 +11,8 @@ import { toast } from "./toast";
 
 /** Die feste Fixture der Seitentests (siehe test/support/e2e-server.ts). */
 const ROOT = fileURLToPath(new URL(`../../.data/e2e-${E2E_APP_PORT}`, import.meta.url));
+const REBOOT_MARKER = join(ROOT, "deep-mine-control", "reboot-called");
+const POWEROFF_MARKER = join(ROOT, "deep-mine-control", "poweroff-called");
 const FILES = {
   procDir: join(ROOT, "proc"),
   sysDir: join(ROOT, "sys"),
@@ -87,4 +90,45 @@ test("3 Sekunden Halten startet Minecraft neu", async ({ page }) => {
   // Solange der Server neu startet, ist der Knopf gesperrt.
   await expect(page.getByTestId("system-restart")).toBeDisabled();
   await expect(page.getByTestId("system-restart")).toBeEnabled({ timeout: 10_000 });
+});
+
+/** Hält einen Knopf `ms` lang gedrückt. hover() wartet, bis er ruhig steht. */
+async function hold(page: import("@playwright/test").Page, testId: string, ms = 3200) {
+  await page.getByTestId(testId).hover();
+  await page.mouse.down();
+  await page.waitForTimeout(ms);
+  await page.mouse.up();
+}
+
+test("3 Sekunden Halten stoppt Minecraft, kurz Halten nicht", async ({ page }) => {
+  await setup();
+  await page.goto("/system");
+
+  await hold(page, "system-stop", 800);
+  await page.waitForTimeout(500);
+  expect((await fake.get()).status).toBe("RUNNING");
+
+  await hold(page, "system-stop");
+  await expect(toast(page, "Minecraft wird gestoppt …")).toBeVisible();
+  await expect(page.getByTestId("status-bar")).toContainText("Server ist aus", { timeout: 5000 });
+  // Gestoppt lässt sich Minecraft nicht noch einmal stoppen, der Rechner aber neu starten.
+  await expect(page.getByTestId("system-stop")).toBeDisabled();
+  await expect(page.getByTestId("system-reboot")).toBeEnabled();
+});
+
+test("Rechner neu starten und ausschalten lösen erst nach 3 Sekunden Halten aus", async ({ page }) => {
+  await setup();
+  await page.goto("/system");
+
+  await hold(page, "system-poweroff", 800);
+  await page.waitForTimeout(1500);
+  expect(existsSync(POWEROFF_MARKER)).toBe(false);
+
+  await hold(page, "system-reboot");
+  await expect(toast(page, "Rechner startet neu.")).toBeVisible();
+  await expect.poll(() => existsSync(REBOOT_MARKER), { timeout: 3000 }).toBe(true);
+
+  await hold(page, "system-poweroff");
+  await expect(toast(page, "Rechner wird ausgeschaltet.")).toBeVisible();
+  await expect.poll(() => existsSync(POWEROFF_MARKER), { timeout: 3000 }).toBe(true);
 });
