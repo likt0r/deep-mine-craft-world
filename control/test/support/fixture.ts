@@ -17,6 +17,8 @@ export interface ServerFixture {
   /** Diese Dateien legen die Test-Befehle für Neustart und Ausschalten an. */
   rebootMarker: string;
   poweroffMarker: string;
+  /** Zustand des Fake-nmcli (test/support/fake-nmcli.mjs). Fehlt die Datei, gilt die Ausgangslage. */
+  nmcliState: string;
   /** Alles leeren und mit einer einzigen Welt neu anlegen. */
   reset(levelName?: string): void;
   addWorld(folder: string): void;
@@ -41,6 +43,7 @@ export function createServerFixture(root = mkdtempSync(join(tmpdir(), "dmc-"))):
     smartFile: join(root, "deep-mine-control", "smart.json"),
     rebootMarker: join(root, "deep-mine-control", "reboot-called"),
     poweroffMarker: join(root, "deep-mine-control", "poweroff-called"),
+    nmcliState: join(root, "nmcli.json"),
     reset(levelName = DEFAULT_LEVEL_NAME) {
       for (const dir of [
         fixture.serverDir,
@@ -54,6 +57,7 @@ export function createServerFixture(root = mkdtempSync(join(tmpdir(), "dmc-"))):
       }
       fixture.addWorld(levelName);
       writeFileSync(fixture.outputFile, "");
+      rmSync(fixture.nmcliState, { force: true });
     },
     addWorld(folder) {
       mkdirSync(join(fixture.worldsDir, folder, "db"), { recursive: true });

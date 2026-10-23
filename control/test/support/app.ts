@@ -6,6 +6,7 @@ import { FAKE_PASSWORD, FAKE_USER, startFakeBsm, type FakeBsm } from "./fake-bsm
 import { createServerFixture, type ServerFixture } from "./fixture";
 
 const entry = fileURLToPath(new URL("../../.output/server/index.mjs", import.meta.url));
+const fakeNmcli = fileURLToPath(new URL("./fake-nmcli.mjs", import.meta.url));
 
 export interface RunningApp {
   url: string;
@@ -40,6 +41,10 @@ export async function startApp(fake: FakeBsm, fixture: ServerFixture, port?: num
       // Statt den Rechner neu zu starten oder auszuschalten, nur eine Datei anlegen.
       NUXT_REBOOT_COMMAND: `/usr/bin/touch ${fixture.rebootMarker}`,
       NUXT_POWEROFF_COMMAND: `/usr/bin/touch ${fixture.poweroffMarker}`,
+      // Fake-nmcli spielt auch iw. Sein Zustand liegt in der Fixture.
+      NUXT_NMCLI_PATH: fakeNmcli,
+      NUXT_IW_PATH: fakeNmcli,
+      FAKE_NMCLI_STATE: fixture.nmcliState,
       NUXT_COUNTDOWN_STEP_MS: "0",
       NUXT_RULES_WAIT_MS: "4000"
     },
