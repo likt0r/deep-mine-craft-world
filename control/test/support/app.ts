@@ -45,6 +45,8 @@ export async function startApp(fake: FakeBsm, fixture: ServerFixture, port?: num
       NUXT_NMCLI_PATH: fakeNmcli,
       NUXT_IW_PATH: fakeNmcli,
       FAKE_NMCLI_STATE: fixture.nmcliState,
+      NUXT_WIFI_SETTINGS_FILE: fixture.wifiSettings,
+      NUXT_WIFI_RESCUE_FILE: fixture.wifiRescue,
       NUXT_COUNTDOWN_STEP_MS: "0",
       NUXT_RULES_WAIT_MS: "4000"
     },

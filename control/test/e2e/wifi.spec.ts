@@ -10,10 +10,10 @@ import { E2E_APP_PORT } from "./ports";
 import { toast } from "./toast";
 
 /** Zustand des Fake-nmcli in der festen Fixture (siehe test/support/e2e-server.ts). */
-const NM_STATE = join(
-  fileURLToPath(new URL(`../../.data/e2e-${E2E_APP_PORT}`, import.meta.url)),
-  "nmcli.json"
-);
+const ROOT = fileURLToPath(new URL(`../../.data/e2e-${E2E_APP_PORT}`, import.meta.url));
+const NM_STATE = join(ROOT, "nmcli.json");
+/** Markierung des Rettungsmodus, die sonst der Wächter anlegt */
+const RESCUE = join(ROOT, "deep-mine-wifi-rescue");
 type NmState = ReturnType<typeof initialState>;
 const nm = (): NmState =>
   existsSync(NM_STATE) ? JSON.parse(readFileSync(NM_STATE, "utf8")) : initialState();
@@ -143,4 +143,37 @@ test("läuft NetworkManager nicht, sagt die Seite das; der Offline-Modus bleibt 
 
   await expect(page.getByTestId("wifi-error")).toContainText("WLAN-Verwaltung antwortet nicht");
   await expect(page.getByTestId("wifi-offline-switch")).toBeEnabled();
+});
+
+test("WLAN ausschalten fragt nach, bleibt aus; der Rettungsmodus wird angezeigt", async ({ page }) => {
+  await page.goto("/system/wlan");
+  const power = page.getByTestId("wifi-enabled-switch");
+  await expect(power).toHaveAttribute("aria-checked", "true");
+
+  await power.click();
+  await expect(page.getByTestId("wifi-disable-warning")).toBeVisible();
+  await page.getByRole("button", { name: "Abbrechen" }).click();
+  expect(nm().radio).toBe(true);
+
+  await power.click();
+  await page.getByTestId("wifi-disable-confirm").click();
+
+  await expect(toast(page, "WLAN ist aus.")).toBeVisible();
+  await expect(power).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByTestId("wifi-status")).toContainText("WLAN ist ausgeschaltet");
+  expect(nm().radio).toBe(false);
+
+  // Der Wächter hat nach 3 Minuten ohne Netz den Rettungsmodus eingeschaltet.
+  setNm((s) => {
+    s.radio = true;
+    s.active = "dmc-ap";
+  });
+  writeFileSync(RESCUE, "");
+  await page.reload();
+  await expect(page.getByTestId("wifi-rescue")).toContainText("Rettungsmodus");
+  await expect(page.getByTestId("wifi-status")).toContainText("Eigenes WLAN");
+
+  await power.click();
+  await expect(toast(page, "WLAN wird eingeschaltet …")).toBeVisible();
+  await expect(page.getByTestId("wifi-rescue")).toHaveCount(0);
 });

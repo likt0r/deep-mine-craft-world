@@ -57,6 +57,32 @@ if (args[0] === "dev" && args[2] === "station") {
 
 const joined = args.join(" ");
 
+/** Wie NetworkManagers Autoconnect: das beste sichtbare hinterlegte WLAN, sonst das eigene. */
+const autoconnect = () => {
+  const visible = state.connections.find((c) => c.mode !== "ap" && state.scan.some((n) => n.ssid === c.ssid));
+  state.active = visible ? visible.name : AP;
+};
+
+if (joined === "-t radio wifi") out(state.radio ? "enabled" : "disabled");
+
+if (joined === "radio wifi on" || joined === "radio wifi off") {
+  changed = true;
+  state.radio = args[2] === "on";
+  if (state.radio) autoconnect();
+  else state.active = null;
+  out("");
+}
+
+if (joined === `-g GENERAL.CONNECTION device show ${DEVICE}`) out(state.active ?? "");
+
+if (joined === "-t -f NAME connection show") out(state.connections.map((c) => escape(c.name)).join("\n"));
+
+if (args[0] === "connection" && args[1] === "down") {
+  changed = true;
+  if (state.active === args[2]) state.active = null;
+  out(`Connection '${args[2]}' successfully deactivated.`);
+}
+
 if (joined === "-t -f NAME,DEVICE connection show")
   out(state.connections.map((c) => `${escape(c.name)}:${state.active === c.name ? DEVICE : ""}`).join("\n"));
 
@@ -112,6 +138,7 @@ if (args[0] === "connection" && args[1] === "up") {
   changed = true;
   const c = find(args[2]);
   if (!c) fail(10, `${args[2]} - no such connection profile.`);
+  if (!state.radio) fail(4, "Connection activation failed: Wi-Fi is disabled.");
   // Ist das WLAN nicht in Reichweite, scheitert es, und NetworkManager nimmt wieder das eigene WLAN.
   if (c.mode !== "ap" && !state.scan.some((n) => n.ssid === c.ssid)) {
     state.active = AP;

@@ -197,6 +197,44 @@ describe("hinterlegte WLANs", () => {
   });
 });
 
+describe("WLAN an/aus", () => {
+  it("ausschalten merkt sich das und schaltet den Funk aus, einschalten umgekehrt", async () => {
+    expect((await h.request("/api/wifi")).body).toMatchObject({ enabled: true, radio: true, rescue: false });
+
+    expect((await h.request("/api/wifi/enabled", { method: "PUT", body: { enabled: false } })).status).toBe(
+      200
+    );
+
+    expect(JSON.parse(readFileSync(h.fixture.wifiSettings, "utf8"))).toEqual({ enabled: false });
+    await expect.poll(() => nm().radio).toBe(false);
+    expect((await h.request("/api/wifi")).body).toMatchObject({ enabled: false, radio: false, mode: "off" });
+
+    await h.request("/api/wifi/enabled", { method: "PUT", body: { enabled: true } });
+
+    expect(JSON.parse(readFileSync(h.fixture.wifiSettings, "utf8"))).toEqual({ enabled: true });
+    await expect.poll(() => nm().radio).toBe(true);
+    expect((await h.request("/api/wifi")).body).toMatchObject({ enabled: true, radio: true, mode: "ap" });
+  });
+
+  it("meldet den Rettungsmodus, wenn der Wächter das WLAN trotz „aus“ eingeschaltet hat", async () => {
+    writeFileSync(h.fixture.wifiSettings, JSON.stringify({ enabled: false }));
+    writeFileSync(h.fixture.wifiRescue, "");
+
+    expect((await h.request("/api/wifi")).body).toMatchObject({
+      enabled: false,
+      radio: true,
+      rescue: true,
+      mode: "ap"
+    });
+  });
+
+  it("lehnt Unsinn mit 400 ab", async () => {
+    expect((await h.request("/api/wifi/enabled", { method: "PUT", body: { enabled: "aus" } })).status).toBe(
+      400
+    );
+  });
+});
+
 describe("PUT /api/wifi/ap", () => {
   it("ändert Name und Passwort und startet das eigene WLAN neu", async () => {
     const res = await h.request("/api/wifi/ap", {

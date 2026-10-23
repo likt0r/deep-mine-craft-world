@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
@@ -68,9 +70,33 @@ async function apDevices(): Promise<number | null> {
   }
 }
 
+/**
+ * Ob das WLAN eingeschaltet sein soll. Liest der Wächter deep-mine-wifi-check (root), schreibt Deep Mine
+ * Control. Fehlt die Datei, ist das WLAN an.
+ */
+async function readEnabled(): Promise<boolean> {
+  try {
+    return JSON.parse(await readFile(useRuntimeConfig().wifiSettingsFile, "utf8")).enabled !== false;
+  } catch {
+    return true;
+  }
+}
+
+/** Schaltet das WLAN ein oder aus und merkt sich das. Aus bleibt aus, bis auf den Rettungsmodus. */
+export async function setWifiEnabled(enabled: boolean): Promise<void> {
+  await writeFile(useRuntimeConfig().wifiSettingsFile, JSON.stringify({ enabled }) + "\n");
+  // Gleich wirksam; der Wächter hält es danach jede Minute so.
+  nmcliInBackground("radio", "wifi", enabled ? "on" : "off");
+}
+
 export async function readWifi(): Promise<WifiInfo> {
-  const { wifiDevice } = useRuntimeConfig();
-  const all = await profiles();
+  const { wifiDevice, wifiRescueFile } = useRuntimeConfig();
+  const [all, enabled, radioText] = await Promise.all([
+    profiles(),
+    readEnabled(),
+    nmcli("-t", "radio", "wifi")
+  ]);
+  const radio = radioText.trim() === "enabled";
   const activeName = all.find((p) => p.device === wifiDevice)?.name ?? null;
 
   const [apLines, ipText, scanText] = await Promise.all([
@@ -113,7 +139,10 @@ export async function readWifi(): Promise<WifiInfo> {
   const apActive = activeName === AP_PROFILE;
   const activeSaved = saved.find((s) => s.active);
   return {
-    mode: apActive ? "ap" : activeSaved ? "client" : "off",
+    enabled,
+    radio,
+    rescue: !enabled && radio && existsSync(wifiRescueFile),
+    mode: !radio ? "off" : apActive ? "ap" : activeSaved ? "client" : "off",
     client: activeSaved ? { ssid: activeSaved.ssid, signal: clientSignal, ip } : null,
     ap: {
       ssid: apSsid,

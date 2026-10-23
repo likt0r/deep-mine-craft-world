@@ -18,6 +18,29 @@ function changed() {
   setTimeout(refresh, 3000);
 }
 
+/** WLAN an/aus. Beim Ausschalten erst nachfragen: wer über das WLAN verbunden ist, wird getrennt. */
+const confirmOff = ref(false);
+const switchingWifi = ref(false);
+
+function toggleWifi(enabled: boolean) {
+  if (enabled) void setWifi(true);
+  else confirmOff.value = true;
+}
+
+async function setWifi(enabled: boolean) {
+  confirmOff.value = false;
+  switchingWifi.value = true;
+  try {
+    await $fetch("/api/wifi/enabled", { method: "PUT", body: { enabled } });
+    feedback.done(enabled ? "WLAN wird eingeschaltet …" : "WLAN ist aus.");
+    changed();
+  } catch {
+    feedback.failed();
+  } finally {
+    switchingWifi.value = false;
+  }
+}
+
 const switchingOffline = ref(false);
 
 async function setOffline(value: boolean) {
@@ -49,6 +72,59 @@ async function setOffline(value: boolean) {
     />
 
     <template v-if="wifi">
+      <SystemCard title="WLAN" icon="i-lucide-wifi" data-testid="wifi-power">
+        <div class="flex items-center gap-3">
+          <span id="wifi-enabled-label" class="flex-1 font-semibold">WLAN eingeschaltet</span>
+          <USwitch
+            size="xl"
+            aria-labelledby="wifi-enabled-label"
+            :modelValue="wifi.enabled"
+            :loading="switchingWifi"
+            :disabled="switchingWifi"
+            data-testid="wifi-enabled-switch"
+            @update:modelValue="toggleWifi"
+          />
+        </div>
+        <p class="text-sm text-muted">
+          Aus bleibt aus. Kommt aber 3 Minuten lang keine Netzwerkverbindung zustande (kein Kabel), schaltet
+          der Server das WLAN zur Rettung von selbst ein.
+        </p>
+        <UAlert
+          v-if="wifi.rescue"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-life-buoy"
+          title="Rettungsmodus"
+          description="3 Minuten lang gab es keine Netzwerkverbindung, deshalb ist das WLAN an. Es geht wieder aus, sobald das Kabel zurück ist und niemand mehr verbunden ist."
+          data-testid="wifi-rescue"
+        />
+      </SystemCard>
+
+      <UModal v-model:open="confirmOff" title="WLAN ausschalten?">
+        <template #body>
+          <p class="text-toned" data-testid="wifi-disable-warning">
+            Wer gerade über das WLAN des Servers verbunden ist, wird getrennt. Ohne Kabel kommt der Server
+            erst nach 3 Minuten über den Rettungsmodus wieder ins WLAN.
+          </p>
+        </template>
+        <template #footer>
+          <div class="flex w-full justify-end gap-2">
+            <UButton color="neutral" variant="subtle" size="lg" @click="confirmOff = false"
+              >Abbrechen</UButton
+            >
+            <UButton
+              color="error"
+              size="lg"
+              icon="i-lucide-wifi-off"
+              data-testid="wifi-disable-confirm"
+              @click="setWifi(false)"
+            >
+              Ausschalten
+            </UButton>
+          </div>
+        </template>
+      </UModal>
+
       <section
         aria-label="WLAN-Status"
         data-testid="wifi-status"
@@ -75,6 +151,7 @@ async function setOffline(value: boolean) {
           <strong class="font-pixel text-xl" :class="wifi.mode === 'off' ? 'text-toned' : 'text-success'">
             <template v-if="wifi.mode === 'client'">Verbunden mit {{ wifi.client?.ssid }}</template>
             <template v-else-if="wifi.mode === 'ap'">Eigenes WLAN „{{ wifi.ap.ssid }}“ ist an</template>
+            <template v-else-if="!wifi.radio">WLAN ist ausgeschaltet</template>
             <template v-else>WLAN ist aus</template>
           </strong>
           <span class="text-sm text-toned">
@@ -90,6 +167,7 @@ async function setOffline(value: boolean) {
                 · Server unter {{ wifi.ap.ip }}</template
               >
             </template>
+            <template v-else-if="!wifi.radio">Der Server ist nur über Kabel erreichbar.</template>
             <template v-else>Weder mit einem WLAN verbunden noch eigenes WLAN an.</template>
           </span>
         </div>
