@@ -42,8 +42,16 @@ BSM behält 3 Backups und 3 heruntergeladene Bedrock-Versionen, vor jedem Start 
 
 ## Deep Mine Control
 
-Die Tablet-Oberfläche unter http://192.168.0.110: Spielmodus, Schwierigkeit, Zeit, Wetter,
-Spielregeln, „Alle zu einem Spieler holen“ und 10 Plätze für Welten (anlegen, laden, umbenennen, löschen).
+Die Tablet-Oberfläche unter http://192.168.0.110 hat vier Bereiche (Handy: Tabs unten, Tablet: Leiste links):
+
+- **Spielen:** aktive Welt mit Status, Spieler („Alle hierher“), Spielmodus, Schwierigkeit, Zeit und Wetter
+- **Welten:** 10 Plätze für Welten (anlegen, laden, umbenennen, löschen durch 3 s Halten)
+- **Regeln:** die Spielregeln der aktiven Welt
+- **System:** CPU-Temperatur und -Last, Arbeitsspeicher, Platte, SSD-Zustand, Laufzeiten, letzte Sicherung,
+  „Minecraft neu starten“ (3 s halten)
+
+Die SMART-Werte der Systemplatte braucht root: Der Timer `deep-mine-smart` schreibt sie alle 30 Minuten
+nach `/var/lib/bsm/deep-mine-control/smart.json` (`install.sh` richtet ihn ein).
 Begriffe stehen in [CONTEXT.md](CONTEXT.md), entwickelt wird in `control/` (siehe [AGENTS.md](AGENTS.md)).
 
 Deep Mine Control spricht mit BSM über ein eigenes BSM-Konto `deep-mine-control` (Rolle moderator reicht).
