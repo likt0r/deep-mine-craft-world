@@ -48,9 +48,8 @@ function tileClass(entry: Place) {
           <template v-if="switching?.place === entry.place">
             <span class="flex min-w-0 flex-1 flex-col" data-testid="place-switching">
               <span class="truncate text-lg font-bold text-highlighted">{{ switching.world }}</span>
-              <span class="text-sm font-semibold text-warning">
-                Wird geladen … · {{ switchPhaseLabel(switching.phase) }}
-              </span>
+              <!-- Die Phase steht in der Statusleiste; hier reicht eine Zeile. -->
+              <span class="truncate text-sm font-semibold text-warning">Wird geladen …</span>
             </span>
             <UIcon name="i-lucide-loader-circle" class="size-6 shrink-0 animate-spin text-warning" />
             <span aria-hidden="true" class="switch-stripes absolute inset-x-0 bottom-0 h-1.5" />
