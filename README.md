@@ -50,7 +50,7 @@ Die Tablet-Oberfläche unter http://192.168.0.110 hat vier Bereiche (Handy: Tabs
 - **Regeln:** die Spielregeln der aktiven Welt
 - **System:** CPU-Temperatur und -Last, Arbeitsspeicher, Platte, SSD-Zustand, Laufzeiten, letzte Sicherung;
   Minecraft neu starten oder stoppen, Rechner neu starten oder ausschalten (jeweils 3 s halten).
-  Unter **System → Netzwerk**: Ethernet (DHCP oder feste IP), hinterlegte WLANs, das eigene WLAN (AP) mit Passwort
+  Unter **System → Netzwerk**: Ethernet (DHCP oder feste IP), VPN (WireGuard), hinterlegte WLANs, das eigene WLAN (AP) mit Passwort
   und QR-Code, Offline-Modus
 
 Rechner neu starten und ausschalten darf Deep Mine Control (Benutzer `bsm`) über die polkit-Regel
@@ -83,6 +83,16 @@ root-Helfer `/usr/local/bin/deep-mine-ethernet` (`server/ethernet.py`). Der prü
 
 Caddy liefert Deep Mine Control unter jeder Adresse aus (`:80`), also auch im eigenen WLAN unter
 `http://10.42.0.1` und nach einem IP-Wechsel.
+
+## VPN
+
+Unter System → Netzwerk lässt sich eine WireGuard-Konfiguration (`.conf`) hochladen. Deep Mine Control prüft sie,
+importiert sie mit `nmcli connection import type wireguard` als Verbindung `dmc-vpn` (eine neue ersetzt die alte)
+und löscht die Datei gleich wieder; der private Schlüssel liegt danach nur bei NetworkManager. Die nicht geheimen
+Angaben für die Anzeige stehen in `/var/lib/bsm/deep-mine-control/vpn.json`. NetworkManager verwaltet dafür
+WireGuard-Geräte mit (`except:type:wireguard`). `PreUp`/`PostUp` & Co. werden abgelehnt (NetworkManager führt sie
+nicht aus). Leitet die Konfiguration allen Verkehr durchs VPN (`AllowedIPs = 0.0.0.0/0`), warnt die Seite: Fällt das
+VPN aus, hat der Server kein Internet.
 
 ## WLAN
 

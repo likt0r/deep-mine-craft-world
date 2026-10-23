@@ -56,6 +56,8 @@ install -m 644 "$HERE/server/50-deep-mine-control.rules" /etc/polkit-1/rules.d/5
 # Das Profil nur anlegen, wenn es fehlt: Name und Passwort aus Deep Mine Control bleiben erhalten.
 iw reg set DE || true
 systemctl enable --now NetworkManager
+# Läuft NetworkManager schon, die Konfiguration oben neu einlesen (z. B. WireGuard dazugekommen).
+nmcli general reload conf || true
 if ! nmcli -t -f NAME connection show | grep -qx dmc-ap; then
   nmcli connection add type wifi ifname wlp3s0 con-name dmc-ap ssid MINECRAFT-World \
     802-11-wireless.mode ap 802-11-wireless.band bg ipv4.method shared \
