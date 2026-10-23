@@ -3,7 +3,7 @@ useSeoMeta({ title: "System · Deep Mine Control" });
 
 const TABS = [
   { to: "/system", label: "Übersicht", icon: "i-lucide-activity", testid: "system-tab-overview" },
-  { to: "/system/wlan", label: "WLAN", icon: "i-lucide-wifi", testid: "system-tab-wlan" }
+  { to: "/system/netzwerk", label: "Netzwerk", icon: "i-lucide-network", testid: "system-tab-netzwerk" }
 ];
 </script>
 

@@ -35,21 +35,28 @@ async function hold(page: Page, testId: string) {
   await page.mouse.up();
 }
 
-test("System hat die Unter-Tabs Übersicht und WLAN", async ({ page }) => {
+test("System hat die Unter-Tabs Übersicht und Netzwerk", async ({ page }) => {
   await page.goto("/system");
   await expect(page.getByTestId("system-tab-overview")).toHaveAttribute("aria-current", "page");
 
-  await page.getByTestId("system-tab-wlan").click();
+  await page.getByTestId("system-tab-netzwerk").click();
 
-  await expect(page).toHaveURL("/system/wlan");
-  await expect(page.getByTestId("system-tab-wlan")).toHaveAttribute("aria-current", "page");
+  await expect(page).toHaveURL("/system/netzwerk");
+  await expect(page.getByTestId("system-tab-netzwerk")).toHaveAttribute("aria-current", "page");
   await expect(page.getByTestId("system-tab-overview")).not.toHaveAttribute("aria-current", "page");
   // In der Hauptnavigation bleibt System markiert.
   await expect(page.getByTestId("nav-system")).toHaveClass(/router-link-active/);
 });
 
-test("eigenes WLAN: Status, Passwort zum Aufdecken und QR-Code", async ({ page }) => {
+test("die alte Adresse /system/wlan leitet nach /system/netzwerk", async ({ page }) => {
   await page.goto("/system/wlan");
+
+  await expect(page).toHaveURL("/system/netzwerk");
+  await expect(page.getByTestId("wifi-status")).toBeVisible();
+});
+
+test("eigenes WLAN: Status, Passwort zum Aufdecken und QR-Code", async ({ page }) => {
+  await page.goto("/system/netzwerk");
 
   await expect(page.getByTestId("wifi-status")).toContainText("Eigenes WLAN „MINECRAFT-World“ ist an");
   await expect(page.getByTestId("wifi-status")).toContainText("2 Geräte verbunden");
@@ -63,7 +70,7 @@ test("eigenes WLAN: Status, Passwort zum Aufdecken und QR-Code", async ({ page }
 });
 
 test("ein WLAN aus der Nähe hinzufügen, dann entfernen", async ({ page }) => {
-  await page.goto("/system/wlan");
+  await page.goto("/system/netzwerk");
   await expect(page.getByTestId("wifi-saved")).toContainText("Noch keine");
 
   await page.locator('[data-testid="wifi-available-network"][data-ssid="Zuhause"]').click();
@@ -91,7 +98,7 @@ test("ein WLAN aus der Nähe hinzufügen, dann entfernen", async ({ page }) => {
 });
 
 test("ein WLAN von Hand hinzufügen: zu kurzes Passwort geht nicht", async ({ page }) => {
-  await page.goto("/system/wlan");
+  await page.goto("/system/netzwerk");
 
   await page.getByTestId("wifi-add-manual").click();
   await page.getByTestId("wifi-add-ssid").fill("Ferienhaus");
@@ -107,7 +114,7 @@ test("ein WLAN von Hand hinzufügen: zu kurzes Passwort geht nicht", async ({ pa
 });
 
 test("eigenes WLAN ändern", async ({ page }) => {
-  await page.goto("/system/wlan");
+  await page.goto("/system/netzwerk");
 
   await page.getByTestId("wifi-ap-edit").click();
   await page.getByTestId("wifi-ap-ssid-input").fill("Deep Mine");
@@ -120,7 +127,7 @@ test("eigenes WLAN ändern", async ({ page }) => {
 });
 
 test("Offline-Modus umschalten setzt online-mode und startet neu", async ({ page }) => {
-  await page.goto("/system/wlan");
+  await page.goto("/system/netzwerk");
   const offline = page.getByTestId("wifi-offline-switch");
   await expect(offline).toHaveAttribute("aria-checked", "false");
 
@@ -139,14 +146,14 @@ test("läuft NetworkManager nicht, sagt die Seite das; der Offline-Modus bleibt 
   setNm((s) => {
     s.broken = true;
   });
-  await page.goto("/system/wlan");
+  await page.goto("/system/netzwerk");
 
   await expect(page.getByTestId("wifi-error")).toContainText("WLAN-Verwaltung antwortet nicht");
   await expect(page.getByTestId("wifi-offline-switch")).toBeEnabled();
 });
 
 test("WLAN ausschalten fragt nach, bleibt aus; der Rettungsmodus wird angezeigt", async ({ page }) => {
-  await page.goto("/system/wlan");
+  await page.goto("/system/netzwerk");
   const power = page.getByTestId("wifi-enabled-switch");
   await expect(power).toHaveAttribute("aria-checked", "true");
 

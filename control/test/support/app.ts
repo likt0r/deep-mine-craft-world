@@ -7,6 +7,7 @@ import { createServerFixture, type ServerFixture } from "./fixture";
 
 const entry = fileURLToPath(new URL("../../.output/server/index.mjs", import.meta.url));
 const fakeNmcli = fileURLToPath(new URL("./fake-nmcli.mjs", import.meta.url));
+const fakeIp = fileURLToPath(new URL("./fake-ip.mjs", import.meta.url));
 
 export interface RunningApp {
   url: string;
@@ -47,6 +48,9 @@ export async function startApp(fake: FakeBsm, fixture: ServerFixture, port?: num
       FAKE_NMCLI_STATE: fixture.nmcliState,
       NUXT_WIFI_SETTINGS_FILE: fixture.wifiSettings,
       NUXT_WIFI_RESCUE_FILE: fixture.wifiRescue,
+      // Fake-ip spielt auch resolvectl.
+      NUXT_IP_PATH: fakeIp,
+      NUXT_RESOLVECTL_PATH: fakeIp,
       NUXT_COUNTDOWN_STEP_MS: "0",
       NUXT_RULES_WAIT_MS: "4000"
     },

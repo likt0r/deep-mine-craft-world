@@ -1,5 +1,5 @@
 <script setup lang="ts">
-useSeoMeta({ title: "WLAN · Deep Mine Control" });
+useSeoMeta({ title: "Netzwerk · Deep Mine Control" });
 
 const { locked, refresh: refreshStatus } = useServerStatus();
 const feedback = useFeedback();
@@ -61,6 +61,8 @@ async function setOffline(value: boolean) {
 
 <template>
   <div class="flex flex-col gap-3.5">
+    <EthernetCard />
+
     <UAlert
       v-if="error && !wifi"
       color="error"

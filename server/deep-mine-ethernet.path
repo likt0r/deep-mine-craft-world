@@ -1,0 +1,10 @@
+[Unit]
+Description=Ethernet-Anfragen von Deep Mine Control (System → Netzwerk)
+
+[Path]
+PathChanged=/var/lib/bsm/deep-mine-control/ethernet-request.json
+PathChanged=/var/lib/bsm/deep-mine-control/ethernet-confirm.json
+Unit=deep-mine-ethernet.service
+
+[Install]
+WantedBy=paths.target

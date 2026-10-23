@@ -27,10 +27,19 @@ export default defineNuxtConfig({
     wifiSettingsFile: "/var/lib/bsm/deep-mine-control/wifi.json",
     /** Legt der Wächter an, solange der Rettungsmodus das WLAN eingeschaltet hat */
     wifiRescueFile: "/run/deep-mine-wifi-rescue",
+    /** Ethernet (System → Netzwerk). Ändern tut der root-Helfer deep-mine-ethernet. */
+    ethernetDevice: "enp1s0",
+    ipPath: "ip",
+    resolvectlPath: "resolvectl",
     /** Länge einer Countdown-Sekunde beim Weltwechsel. Tests setzen 0. */
     countdownStepMs: 1000,
     /** So lange wartet das Auslesen der Spielregeln auf die Ausgabe von `gamerule`. */
     rulesWaitMs: 15000
+  },
+
+  // Der Unterbereich hieß früher WLAN.
+  routeRules: {
+    "/system/wlan": { redirect: "/system/netzwerk" }
   },
 
   devtools: { enabled: true },

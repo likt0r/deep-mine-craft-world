@@ -2,15 +2,16 @@
 	auto_https disable_redirects
 }
 
-# HOST_IP ersetzt install.sh durch die IP des Servers.
+# HOST_IP ersetzt install.sh durch die IP des Servers. 10.42.0.1 ist der Server im eigenen WLAN (AP).
 
 # BSM (Admin, mit Anmeldung)
-https://HOST_IP, https://localhost {
+https://HOST_IP, https://10.42.0.1, https://localhost {
 	tls internal
 	reverse_proxy 127.0.0.1:11325
 }
 
-# Deep Mine Control (Tablet, ohne Anmeldung, nur im LAN)
-http://HOST_IP {
+# Deep Mine Control (Tablet, ohne Anmeldung, nur im LAN): unter jeder Adresse, also auch im eigenen WLAN
+# und nach einem Wechsel der IP-Adresse.
+:80 {
 	reverse_proxy 127.0.0.1:3000
 }
