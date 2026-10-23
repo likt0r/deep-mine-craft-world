@@ -1,11 +1,13 @@
 <script setup lang="ts">
 /** Aktionsmenü von unten für einen Platz: Laden, Umbenennen, Löschen oder eine neue Welt anlegen. */
-const props = defineProps<{ place: Place | null }>();
+/** `confirmLoad`: gleich mit der Warnung vor dem Laden öffnen (aus „Welt wechseln“, wenn jemand spielt). */
+const props = defineProps<{ place: Place | null; confirmLoad?: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 
 const { status, locked, refresh: refreshStatus } = useServerStatus();
 const { refresh: refreshPlaces } = usePlaces();
 const feedback = useFeedback();
+const loadWorld = useWorldLoad();
 
 const players = computed(() => status.value?.players ?? []);
 const world = computed(() => props.place?.world ?? null);
@@ -23,11 +25,11 @@ const open = computed({
   }
 });
 
-// Jeder Platz beginnt im Menü.
+// Jeder Platz beginnt im Menü, außer es soll gleich geladen werden.
 watch(
   () => props.place?.place,
   () => {
-    view.value = "menu";
+    view.value = props.confirmLoad ? "confirm" : "menu";
     renameFailed.value = false;
   }
 );
@@ -45,16 +47,7 @@ function requestLoad() {
 
 async function load() {
   if (!props.place || !world.value) return;
-  const label = world.value.name;
-  try {
-    await $fetch(`/api/places/${props.place.place}/load`, { method: "POST" });
-    emit("close");
-    feedback.done(`${label} wird geladen …`);
-    // Der Status zeigt sofort „Welt wird gewechselt …“ und sperrt die Knöpfe.
-    await refreshStatus();
-  } catch {
-    feedback.failed();
-  }
+  if (await loadWorld(props.place.place, world.value.name)) emit("close");
 }
 
 function startRename() {
@@ -211,7 +204,14 @@ async function onCreated(created: string) {
           >
             Trotzdem laden
           </UButton>
-          <UButton color="neutral" variant="subtle" size="xl" block class="block-btn" @click="view = 'menu'">
+          <UButton
+            color="neutral"
+            variant="subtle"
+            size="xl"
+            block
+            class="block-btn"
+            @click="confirmLoad ? emit('close') : (view = 'menu')"
+          >
             Abbrechen
           </UButton>
         </div>
