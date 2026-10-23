@@ -51,14 +51,17 @@ const COUNTDOWN = [10, 5, 3, 2, 1];
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Wechselt die aktive Welt: 10 s Countdown im Chat, dann Properties setzen und neu starten.
- * BSM antwortet auf den Neustart erst, wenn der Server wieder läuft.
+ * Wechselt die aktive Welt: Spielt jemand, erst 10 s Countdown im Chat; sonst gleich.
+ * Dann Properties setzen und neu starten. BSM antwortet auf den Neustart erst, wenn der Server wieder läuft.
  */
 export async function switchWorld(worldName: string, properties: Record<string, string>): Promise<void> {
-  const step = Number(useRuntimeConfig().countdownStepMs);
-  for (const [i, seconds] of COUNTDOWN.entries()) {
-    await bsm.sendCommand(`say Gleich geht es nach „${worldName}“! Neustart in ${seconds} s.`);
-    await sleep((seconds - (COUNTDOWN[i + 1] ?? 0)) * step);
+  const { players } = await bsm.summary();
+  if (players.length > 0) {
+    const step = Number(useRuntimeConfig().countdownStepMs);
+    for (const [i, seconds] of COUNTDOWN.entries()) {
+      await bsm.sendCommand(`say Gleich geht es nach „${worldName}“! Neustart in ${seconds} s.`);
+      await sleep((seconds - (COUNTDOWN[i + 1] ?? 0)) * step);
+    }
   }
   if (switching) switching.phase = "restart";
   await bsm.setProperties(properties);

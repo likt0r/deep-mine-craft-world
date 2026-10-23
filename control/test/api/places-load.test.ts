@@ -23,7 +23,9 @@ beforeEach(async () => {
 const notBusy = async () => (await h.request("/api/status")).body.busy;
 
 describe("POST /api/places/{n}/load", () => {
-  it("zählt im Chat herunter, setzt dann die Properties der Welt und startet neu", async () => {
+  it("mit Spielern: zählt im Chat herunter, setzt dann die Properties der Welt und startet neu", async () => {
+    h.fake.state.players = ["Lena"];
+
     const res = await h.request("/api/places/2/load", { method: "POST" });
 
     expect(res.status).toBe(200);
@@ -44,6 +46,19 @@ describe("POST /api/places/{n}/load", () => {
     expect(h.fake.calls.find((c) => c.path.endsWith("/properties/set"))?.body).toEqual({
       properties: { "level-name": "w-bauwelt", gamemode: "survival", difficulty: "hard" }
     });
+  });
+
+  it("ohne Spieler: kein Countdown, gleich Properties setzen und neu starten", async () => {
+    const res = await h.request("/api/places/2/load", { method: "POST" });
+
+    expect(res.status).toBe(200);
+    await expect.poll(notBusy).toBe(false);
+
+    const steps = h.fake.calls
+      .filter((c) => /\/(send_command|properties\/set|restart)$/.test(c.path))
+      .map((c) => c.path);
+    expect(steps).toEqual(["/api/server/Bedrock/properties/set", "/api/server/Bedrock/restart"]);
+    expect(h.fake.commands()).toEqual([]);
   });
 
   it("macht die geladene Welt zur aktiven Welt", async () => {
@@ -104,10 +119,12 @@ describe("POST /api/places/{n}/load", () => {
 
   it("gibt die Sperre wieder frei, wenn der Neustart fehlschlägt", async () => {
     h.fake.state.status = "STOPPED";
+    // Mit Spieler kommt der Countdown, und den lehnt BSM ohne laufenden Server ab.
+    h.fake.state.players = ["Lena"];
 
     await h.request("/api/places/2/load", { method: "POST" });
 
-    // Ohne laufenden Server lehnt BSM Befehle ab, der Weltwechsel bricht ab.
+    // Der Weltwechsel bricht ab, ohne die Properties zu ändern.
     await expect.poll(notBusy).toBe(false);
     expect(h.fake.state.properties["level-name"]).toBe("Bedrock level");
   });
