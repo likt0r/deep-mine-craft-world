@@ -14,6 +14,10 @@ export function initialState() {
       { ssid: "MINECRAFT-World", signal: 0, security: "WPA2" }
     ],
     stations: 2,
+    /** WLAN-Funk an (`nmcli radio wifi`) */
+    radio: true,
+    /** Kabel steckt: Standardroute über enp1s0 (für das Fake-ip) */
+    wired: true,
     /** NetworkManager läuft nicht: jeder Aufruf scheitert. */
     broken: false
   };

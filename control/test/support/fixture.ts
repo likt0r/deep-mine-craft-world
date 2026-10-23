@@ -19,6 +19,9 @@ export interface ServerFixture {
   poweroffMarker: string;
   /** Zustand des Fake-nmcli (test/support/fake-nmcli.mjs). Fehlt die Datei, gilt die Ausgangslage. */
   nmcliState: string;
+  /** WLAN an/aus und Markierung des Rettungsmodus (sonst /var/lib/... und /run) */
+  wifiSettings: string;
+  wifiRescue: string;
   /** Alles leeren und mit einer einzigen Welt neu anlegen. */
   reset(levelName?: string): void;
   addWorld(folder: string): void;
@@ -44,6 +47,8 @@ export function createServerFixture(root = mkdtempSync(join(tmpdir(), "dmc-"))):
     rebootMarker: join(root, "deep-mine-control", "reboot-called"),
     poweroffMarker: join(root, "deep-mine-control", "poweroff-called"),
     nmcliState: join(root, "nmcli.json"),
+    wifiSettings: join(root, "deep-mine-control", "wifi.json"),
+    wifiRescue: join(root, "deep-mine-wifi-rescue"),
     reset(levelName = DEFAULT_LEVEL_NAME) {
       for (const dir of [
         fixture.serverDir,
@@ -59,6 +64,7 @@ export function createServerFixture(root = mkdtempSync(join(tmpdir(), "dmc-"))):
       writeFileSync(fixture.outputFile, "");
       rmSync(fixture.nmcliState, { force: true });
       rmSync(`${fixture.nmcliState}.calls`, { force: true });
+      rmSync(fixture.wifiRescue, { force: true });
     },
     addWorld(folder) {
       mkdirSync(join(fixture.worldsDir, folder, "db"), { recursive: true });

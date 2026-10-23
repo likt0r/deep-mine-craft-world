@@ -62,8 +62,11 @@ systemd-networkd/netplan (`/etc/NetworkManager/conf.d/90-deep-mine.conf`, `/etc/
 - Hinterlegte WLANs heißen in NetworkManager `dmc-wlan-N` (Priorität 10), das eigene WLAN `dmc-ap`
   (Standard `MINECRAFT-World` / `deep-mine-craft`, Priorität −100). Ohne hinterlegtes WLAN in Reichweite geht
   der AP an; hängt ein Kabel am Router, gibt er das Internet weiter (Server unter `10.42.0.1`).
-- Der Timer `deep-mine-wifi-check` nimmt den AP alle 5 Minuten kurz herunter, wenn niemand daran hängt, damit
-  der Server zurück ins hinterlegte WLAN findet.
+- Der Timer `deep-mine-wifi-check` (jede Minute) nimmt den AP alle 5 Minuten kurz herunter, wenn niemand daran
+  hängt, damit der Server zurück ins hinterlegte WLAN findet.
+- Das WLAN lässt sich ausschalten (`/var/lib/bsm/deep-mine-control/wifi.json`), und aus bleibt aus. **Rettungsmodus:**
+  Hat der Server 3 Minuten lang keine Netzwerkverbindung außer über das WLAN, schaltet der Timer es ein
+  (`/run/deep-mine-wifi-rescue`). Ist das Kabel zurück und niemand mehr am eigenen WLAN, geht es wieder aus.
 - Ohne Internet müssen sich Spieler normalerweise bei Xbox Live anmelden; der **Offline-Modus** schaltet
   `online-mode` aus. Ob Konsolen ganz ohne Internet beitreten können, hängt vom Gerät ab.
 
