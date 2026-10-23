@@ -29,7 +29,10 @@ export const REAL_SMART = {
 };
 
 /** Legt /proc-, /sys- und SMART-Dateien in der Fixture an. */
-export function writeSystemFiles(fixture: ServerFixture, files: SystemFiles = {}) {
+export function writeSystemFiles(
+  fixture: Pick<ServerFixture, "procDir" | "sysDir" | "smartFile">,
+  files: SystemFiles = {}
+) {
   const {
     coreTemps = [39000, 38000, 34000, 28000],
     otherChips = [{ name: "acpitz", temp: 26800 }],
