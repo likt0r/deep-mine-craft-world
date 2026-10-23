@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { fake } from "./fake";
 import { toast } from "./toast";
+import { setVisibility } from "./visibility";
 
 test.beforeEach(async () => {
   await fake.reset();
@@ -67,4 +68,51 @@ test("schlägt das Umschalten fehl, springt der Schalter zurück", async ({ page
 
   await expect(toast(page, "Das hat nicht geklappt. Versuch es nochmal.")).toBeVisible();
   await expect(page.getByTestId("rule-pvp")).toBeChecked();
+});
+
+const reads = async () => (await fake.commands()).filter((c) => c === "gamerule").length;
+
+test("eine am Server geänderte Regel erscheint ohne Neuladen", async ({ page }) => {
+  await page.goto("/regeln");
+  await expect(page.getByTestId("rule-pvp")).toBeChecked();
+
+  // Jemand schaltet im Spiel oder in BSM den Schaden zwischen Spielern aus.
+  await fake.set({
+    gamerules: {
+      doDayLightCycle: "true",
+      doWeatherCycle: "true",
+      keepInventory: "false",
+      doMobSpawning: "true",
+      doFireTick: "true",
+      tntExplodes: "true",
+      pvp: "false",
+      showCoordinates: "false"
+    }
+  });
+
+  await expect(page.getByTestId("rule-pvp")).not.toBeChecked({ timeout: 8000 });
+});
+
+test("im Hintergrund wird nicht gefragt, wieder sichtbar sofort", async ({ page }) => {
+  await page.goto("/regeln");
+  await expect(page.getByTestId("rule-pvp")).toBeChecked();
+
+  await setVisibility(page, "hidden");
+  const before = await reads();
+  await page.waitForTimeout(6000);
+  expect(await reads()).toBe(before);
+
+  await setVisibility(page, "visible");
+  await expect.poll(reads, { timeout: 2000 }).toBe(before + 1);
+});
+
+test("in anderen Bereichen wird nicht nach den Regeln gefragt", async ({ page }) => {
+  await page.goto("/regeln");
+  await expect(page.getByTestId("rule-pvp")).toBeChecked();
+
+  await page.getByTestId("nav-spielen").click();
+  const before = await reads();
+  await page.waitForTimeout(6000);
+
+  expect(await reads()).toBe(before);
 });

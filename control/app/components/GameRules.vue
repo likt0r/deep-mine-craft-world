@@ -36,19 +36,27 @@ const feedback = useFeedback();
 const rules = ref<Rules | null>(null);
 const busy = ref<RuleName | null>(null);
 
-/** Kommen alle Regeln unbekannt zurück, startet der Server vielleicht gerade noch: später nachfragen. */
-const RETRIES = 3;
-const RETRY_MS = 5000;
-let retryTimer: ReturnType<typeof setTimeout> | undefined;
+/**
+ * So oft werden die Regeln neu gelesen, solange der Bereich offen und sichtbar ist. Damit erscheinen
+ * Änderungen aus dem Spiel oder aus BSM, und nach einem Neustart werden „unbekannte“ Regeln bekannt.
+ */
+const POLL_MS = 5000;
 
-async function load(attempt = 0) {
-  rules.value = await $fetch<Rules>("/api/rules");
-  const allUnknown = Object.values(rules.value).every((value) => value === null);
-  if (allUnknown && attempt < RETRIES) retryTimer = setTimeout(() => load(attempt + 1), RETRY_MS);
+/** Zählt das Umschalten. Eine Abfrage, die davor begonnen hat, ist veraltet. */
+let toggles = 0;
+
+async function load() {
+  if (busy.value) return;
+  const started = toggles;
+  const fresh = await $fetch<Rules>("/api/rules");
+  if (started !== toggles || busy.value) return;
+  // Meldet der Server eine Regel gerade nicht (z. B. beim Neustart), bleibt der letzte bekannte Wert stehen.
+  const previous = rules.value;
+  if (previous) for (const name of RULE_NAMES) fresh[name] ??= previous[name];
+  rules.value = fresh;
 }
 
-onMounted(() => load());
-onBeforeUnmount(() => clearTimeout(retryTimer));
+useWhileVisible(load, POLL_MS);
 
 /** Anzeige: invertierte Regeln zeigen den Schalterzustand, nicht den Regelwert. */
 function isOn(rule: Rule): boolean {
@@ -59,6 +67,7 @@ function isOn(rule: Rule): boolean {
 
 async function toggle(rule: Rule, on: boolean) {
   if (!rules.value) return;
+  toggles++;
   const previous = rules.value[rule.name];
   const value = rule.inverted ? !on : on;
   rules.value[rule.name] = value;

@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { fake } from "./fake";
+import { setVisibility } from "./visibility";
 
 const AREAS = [
   { path: "/", nav: "nav-spielen" },
@@ -74,4 +75,22 @@ test("Server aus: außerhalb von Spielen ein Hinweis mit Weg zum Starten", async
   await page.getByRole("link", { name: "Zum Starten" }).click();
   await expect(page).toHaveURL("/");
   await expect(page.getByTestId("server-off")).toBeVisible();
+});
+
+test("der Status pausiert im Hintergrund und lädt beim Aufwachen sofort", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("active-world")).toHaveText("Pandaland");
+  let requests = 0;
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/status")) requests++;
+  });
+
+  await setVisibility(page, "hidden");
+  await page.waitForTimeout(4000);
+  expect(requests).toBe(0);
+
+  // Inzwischen kommt jemand dazu; aufgeweckt zeigt die Seite das gleich.
+  await fake.set({ players: ["Lena"] });
+  await setVisibility(page, "visible");
+  await expect(page.getByTestId("player-count")).toContainText("1 online", { timeout: 1500 });
 });

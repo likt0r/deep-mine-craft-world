@@ -6,11 +6,8 @@ const feedback = useFeedback();
 
 const { data: system, refresh } = useFetch<SystemInfo>("/api/system", { key: "system" });
 
-// Die Werte laden alle 5 s neu, solange der Bereich offen ist.
-onMounted(() => {
-  const timer = setInterval(refresh, 5000);
-  onBeforeUnmount(() => clearInterval(timer));
-});
+// Die Werte laden alle 5 s neu, solange der Bereich offen und sichtbar ist.
+useWhileVisible(refresh, 5000, { immediate: false });
 
 const UNKNOWN = "unbekannt";
 

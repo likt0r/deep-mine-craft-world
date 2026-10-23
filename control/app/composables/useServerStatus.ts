@@ -1,14 +1,12 @@
-/** Lädt alle 3 s Status und Plätze neu, egal in welchem Bereich man ist. Nur einmal in der App aufrufen (app.vue). */
+/**
+ * Lädt alle 3 s Status und Plätze neu, egal in welchem Bereich man ist, solange die Seite sichtbar ist.
+ * Nur einmal in der App aufrufen (app.vue).
+ */
 export function useStatusPolling() {
   const { refresh } = useFetch<Status>("/api/status", { key: "status" });
 
-  onMounted(() => {
-    const timer = setInterval(() => {
-      refresh();
-      refreshNuxtData("places");
-    }, 3000);
-    onBeforeUnmount(() => clearInterval(timer));
-  });
+  // Den ersten Stand bringt schon das Rendern auf dem Server mit.
+  useWhileVisible(() => Promise.all([refresh(), refreshNuxtData("places")]), 3000, { immediate: false });
 }
 
 /** Serverstatus für Bereiche und Komponenten. Abgefragt wird er von useStatusPolling. */
