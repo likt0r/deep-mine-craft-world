@@ -27,3 +27,9 @@ export function formatWhen(iso: string, now = new Date()): string {
   if (diff === 1) return `gestern, ${time}`;
   return `${date.toLocaleDateString("de-DE")}, ${time}`;
 }
+
+/** 12_345_678 → „11,8 MB“, kleine Dateien in KB. */
+export function formatSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toLocaleString("de-DE", { maximumFractionDigits: 1 })} MB`;
+}
