@@ -62,6 +62,7 @@ async function setOffline(value: boolean) {
 <template>
   <div class="flex flex-col gap-3.5">
     <EthernetCard />
+    <VpnCard />
 
     <UAlert
       v-if="error && !wifi"

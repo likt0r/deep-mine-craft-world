@@ -4,6 +4,7 @@
 // als eine JSON-Zeile in $FAKE_NMCLI_STATE.calls. Die API ruft nmcli gleichzeitig auf: Lesen schreibt
 // deshalb nichts, Ändern schreibt atomar (temporäre Datei, dann umbenennen).
 import { appendFileSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { basename } from "node:path";
 
 import { initialState } from "./fake-nmcli-state.mjs";
 
@@ -77,14 +78,54 @@ if (joined === `-g GENERAL.CONNECTION device show ${DEVICE}`) out(state.active ?
 
 if (joined === "-t -f NAME connection show") out(state.connections.map((c) => escape(c.name)).join("\n"));
 
-if (args[0] === "connection" && args[1] === "down") {
+if (args[0] === "connection" && args[1] === "down" && find(args[2])?.mode !== "wireguard") {
   changed = true;
   if (state.active === args[2]) state.active = null;
   out(`Connection '${args[2]}' successfully deactivated.`);
 }
 
+/** Gerät einer Verbindung: das WLAN für die aktive WLAN-Verbindung, eigenes Gerät für ein aktives VPN. */
+const deviceOf = (c) =>
+  c.mode === "wireguard" ? (c.up ? c.name : "") : state.active === c.name ? DEVICE : "";
+
 if (joined === "-t -f NAME,DEVICE connection show")
-  out(state.connections.map((c) => `${escape(c.name)}:${state.active === c.name ? DEVICE : ""}`).join("\n"));
+  out(state.connections.map((c) => `${escape(c.name)}:${deviceOf(c)}`).join("\n"));
+
+// --- WireGuard (VPN) ---
+if (args[0] === "connection" && args[1] === "import" && args[3] === "wireguard" && args[4] === "file") {
+  changed = true;
+  const text = readFileSync(args[5], "utf8");
+  const name = basename(args[5]).replace(/\.conf$/, "");
+  if (!/PrivateKey/.test(text)) fail(1, "Error: failed to import: invalid secret 'PrivateKey'.");
+  if (state.connections.some((c) => c.name === name)) fail(1, `Error: a connection '${name}' exists.`);
+  state.connections.push({ name, mode: "wireguard", autoconnect: "yes", up: false, imported: text.length });
+  out(`Connection '${name}' successfully added.`);
+}
+
+if (
+  args[0] === "-g" &&
+  args[1] === "connection.autoconnect" &&
+  args[2] === "connection" &&
+  args[3] === "show"
+) {
+  const c = find(args[4]);
+  if (!c) fail(10, `${args[4]} - no such connection profile.`);
+  out(c.autoconnect ?? "yes");
+}
+
+if (
+  args[0] === "connection" &&
+  (args[1] === "up" || args[1] === "down") &&
+  find(args[2])?.mode === "wireguard"
+) {
+  changed = true;
+  find(args[2]).up = args[1] === "up";
+  out(
+    args[1] === "up"
+      ? "Connection successfully activated."
+      : `Connection '${args[2]}' successfully deactivated.`
+  );
+}
 
 if (joined.startsWith("-s -g 802-11-wireless.ssid,802-11-wireless-security.psk connection show ")) {
   const c = find(args.at(-1));
@@ -131,6 +172,7 @@ if (args[0] === "connection" && args[1] === "modify") {
   const p = pairs(3);
   if (p["802-11-wireless.ssid"]) c.ssid = p["802-11-wireless.ssid"];
   if (p["wifi-sec.psk"]) c.psk = p["wifi-sec.psk"];
+  if (p["connection.autoconnect"]) c.autoconnect = p["connection.autoconnect"];
   out("");
 }
 
