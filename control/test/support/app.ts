@@ -50,6 +50,8 @@ export async function startApp(fake: FakeBsm, fixture: ServerFixture, port?: num
       NUXT_WIFI_RESCUE_FILE: fixture.wifiRescue,
       // Fake-ip spielt auch resolvectl.
       NUXT_IP_PATH: fakeIp,
+      // Kleine Grenze, damit der Test für zu große Welten keine Gigabytes braucht.
+      NUXT_WORLD_MAX_BYTES: "1000000",
       NUXT_RESOLVECTL_PATH: fakeIp,
       NUXT_COUNTDOWN_STEP_MS: "0",
       NUXT_RULES_WAIT_MS: "4000"

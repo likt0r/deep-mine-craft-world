@@ -33,6 +33,8 @@ export default defineNuxtConfig({
     resolvectlPath: "resolvectl",
     /** Zum Entpacken von Backups (python3 -m zipfile) */
     pythonPath: "python3",
+    /** Höchstens so groß darf eine Welt ausgepackt sein (Schutz vor ZIP-Bomben, 4 GB). */
+    worldMaxBytes: 4 * 1024 ** 3,
     /** Länge einer Countdown-Sekunde beim Weltwechsel. Tests setzen 0. */
     countdownStepMs: 1000,
     /** So lange wartet das Auslesen der Spielregeln auf die Ausgabe von `gamerule`. */

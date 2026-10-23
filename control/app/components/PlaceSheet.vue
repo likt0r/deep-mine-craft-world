@@ -87,6 +87,20 @@ async function remove() {
   }
 }
 
+/** Freier Platz: neue Welt anlegen oder eine .mcworld importieren. */
+const freeMode = ref<"new" | "import">("new");
+watch(
+  () => props.place?.place,
+  () => (freeMode.value = "new")
+);
+
+/** Importiert, aber nicht geladen: nur die Plätze neu holen. */
+async function onImported(imported: string) {
+  emit("close");
+  feedback.done(`${imported} importiert. Du kannst sie jetzt laden.`);
+  await refreshPlaces();
+}
+
 /** Die neue Welt wird gleich geladen: Status und Plätze sofort neu holen. */
 async function onCreated(created: string) {
   emit("close");
@@ -99,7 +113,7 @@ async function onCreated(created: string) {
   <UDrawer
     v-model:open="open"
     handleOnly
-    :title="world ? world.name : `Neue Welt auf Platz ${place?.place}`"
+    :title="world ? world.name : `Platz ${place?.place} ist frei`"
     :description="world ? `Platz ${place?.place}` : 'Name, Welttyp und Startmodus'"
     :ui="{
       content: 'bg-muted',
@@ -123,21 +137,48 @@ async function onCreated(created: string) {
           </span>
         </div>
       </div>
-      <h2 v-else class="font-pixel text-2xl font-bold text-highlighted">
-        Neue Welt auf Platz {{ place?.place }}
-      </h2>
+      <h2 v-else class="font-pixel text-2xl font-bold text-highlighted">Platz {{ place?.place }} ist frei</h2>
     </template>
 
     <template #body>
       <div class="flex flex-col gap-3" data-testid="place-sheet">
-        <NewWorldForm
-          v-if="place && !world"
-          :key="place.place"
-          :place="place.place"
-          :players="players"
-          @created="onCreated"
-          @cancel="emit('close')"
-        />
+        <template v-if="place && !world">
+          <div class="grid grid-cols-2 gap-2" role="group" aria-label="Was auf den Platz kommt">
+            <UButton
+              v-for="option in [
+                { value: 'new', label: 'Neue Welt', icon: 'i-lucide-sparkles' },
+                { value: 'import', label: 'Importieren', icon: 'i-lucide-file-up' }
+              ] as const"
+              :key="option.value"
+              :icon="option.icon"
+              :color="freeMode === option.value ? 'primary' : 'neutral'"
+              :variant="freeMode === option.value ? 'solid' : 'subtle'"
+              :aria-pressed="freeMode === option.value"
+              size="xl"
+              block
+              class="block-btn"
+              :data-testid="`free-${option.value}`"
+              @click="freeMode = option.value"
+            >
+              {{ option.label }}
+            </UButton>
+          </div>
+          <NewWorldForm
+            v-if="freeMode === 'new'"
+            :key="place.place"
+            :place="place.place"
+            :players="players"
+            @created="onCreated"
+            @cancel="emit('close')"
+          />
+          <ImportWorldForm
+            v-else
+            :key="`import-${place.place}`"
+            :place="place.place"
+            @imported="onImported"
+            @cancel="emit('close')"
+          />
+        </template>
 
         <template v-else-if="view === 'menu' && place">
           <UButton
