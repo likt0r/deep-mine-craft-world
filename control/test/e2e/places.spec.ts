@@ -16,7 +16,7 @@ test("zeigt 10 Plätze, „Pandaland“ belegt und als aktiv markiert", async ({
       "level-seed": ""
     }
   });
-  await page.goto("/");
+  await page.goto("/welten");
 
   await expect(page.getByTestId(/^place-\d+$/)).toHaveCount(10);
   await expect(page.getByTestId("place-1")).toContainText("Platz 1");
@@ -41,7 +41,7 @@ test("Welt umbenennen: Stift-Symbol, neuer Name steht sofort auf der Kachel", as
       "level-seed": ""
     }
   });
-  await page.goto("/");
+  await page.goto("/welten");
 
   // Ein Stift gibt es nur auf belegten Kacheln.
   await expect(page.getByTestId("place-2").getByTestId("place-rename")).toHaveCount(0);
@@ -76,7 +76,7 @@ test("leerer Name wird abgelehnt, der alte Name bleibt stehen", async ({ page })
       "level-seed": ""
     }
   });
-  await page.goto("/");
+  await page.goto("/welten");
 
   const tile = page.getByTestId("place-1");
   await tile.getByTestId("place-rename").click();
@@ -101,7 +101,7 @@ test("Abbrechen verwirft die Eingabe", async ({ page }) => {
       "level-seed": ""
     }
   });
-  await page.goto("/");
+  await page.goto("/welten");
 
   const tile = page.getByTestId("place-1");
   await tile.getByTestId("place-rename").click();

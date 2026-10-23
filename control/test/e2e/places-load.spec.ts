@@ -13,7 +13,7 @@ const loadCalls = async () =>
   (await fake.get()).calls.filter((c) => c.path.endsWith("/properties/set") || c.path.endsWith("/restart"));
 
 async function openPage(page: Page) {
-  await page.goto("/");
+  await page.goto("/welten");
   await expect(page.getByTestId("place-2")).toContainText("Bauwelt");
 }
 
@@ -25,10 +25,10 @@ test("ohne Spieler lädt „Laden“ sofort, die Seite zeigt den Wechsel und dan
 
   await page.getByTestId("place-2").getByTestId("place-load").click();
 
-  await expect(page.getByTestId("server-state")).toHaveText("Welt wird gewechselt …");
+  await expect(page.getByTestId("status-banner")).toHaveText("Welt wird gewechselt …");
   await expect(page.getByTestId("controls")).toHaveAttribute("disabled");
-  await expect(page.getByTestId("active-world")).toHaveText("Bauwelt", { timeout: 10_000 });
-  await expect(page.getByTestId("server-state")).toHaveText("Läuft");
+  await expect(page.getByTestId("place-2").getByTestId("place-active")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId("status-banner")).toBeHidden();
   await expect(page.getByTestId("place-2").getByTestId("place-active")).toBeVisible();
   await expect(page.getByTestId("place-1").getByTestId("place-load")).toBeVisible();
 });
@@ -48,7 +48,7 @@ test("mit Spielern warnt ein Dialog und nennt sie; Abbrechen lädt nicht, Wechse
   await page.getByTestId("place-2").getByTestId("place-load").click();
   await page.getByTestId("switch-confirm").click();
 
-  await expect(page.getByTestId("active-world")).toHaveText("Bauwelt", { timeout: 10_000 });
+  await expect(page.getByTestId("place-2").getByTestId("place-active")).toBeVisible({ timeout: 10_000 });
   expect((await loadCalls()).map((c) => c.path.split("/").pop())).toEqual(["set", "restart"]);
 });
 

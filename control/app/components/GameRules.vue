@@ -44,7 +44,6 @@ async function toggle(rule: Rule, on: boolean) {
 
 <template>
   <section class="flex flex-col gap-3" data-testid="rules">
-    <h2 class="text-xl font-semibold">Spielregeln</h2>
     <USkeleton v-if="!rules" class="h-64" data-testid="rules-loading" />
     <div v-else class="flex flex-col gap-2">
       <div

@@ -55,7 +55,7 @@ test.beforeEach(async () => {
 });
 
 test("kurzes Tippen löscht nicht", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/welten");
   const tile = page.getByTestId("place-2");
   await expect(tile).toContainText("Bauwelt");
 
@@ -67,7 +67,7 @@ test("kurzes Tippen löscht nicht", async ({ page }) => {
 });
 
 test("3 Sekunden Halten löscht die Welt, der Platz ist danach frei", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/welten");
   const tile = page.getByTestId("place-2");
   await expect(tile).toContainText("Bauwelt");
   const box = (await tile.getByTestId("place-delete").boundingBox())!;
@@ -84,7 +84,7 @@ test("3 Sekunden Halten löscht die Welt, der Platz ist danach frei", async ({ p
 });
 
 test("loslassen vor 3 Sekunden bricht ab", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/welten");
   const tile = page.getByTestId("place-2");
   await expect(tile).toContainText("Bauwelt");
   const box = (await tile.getByTestId("place-delete").boundingBox())!;
@@ -100,7 +100,7 @@ test("loslassen vor 3 Sekunden bricht ab", async ({ page }) => {
 });
 
 test("auf der aktiven Welt ist der Löschen-Knopf gesperrt", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/welten");
   const tile = page.getByTestId("place-1");
   await expect(tile).toContainText("Pandaland");
 

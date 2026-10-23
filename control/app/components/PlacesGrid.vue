@@ -118,7 +118,6 @@ async function deleteWorld(place: number) {
 
 <template>
   <section class="flex flex-col gap-3" data-testid="places">
-    <h2 class="text-xl font-semibold">Welten</h2>
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       <div
         v-for="entry in places?.places"

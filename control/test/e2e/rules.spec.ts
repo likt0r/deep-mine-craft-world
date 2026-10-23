@@ -20,7 +20,7 @@ test.beforeEach(async () => {
 });
 
 test("Schalter zeigen den Zustand und drehen ihn um", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/regeln");
 
   // „Zeit anhalten“ ist invertiert: doDayLightCycle=true bedeutet aus.
   await expect(page.getByTestId("rule-dodaylightcycle")).not.toBeChecked();
@@ -37,7 +37,7 @@ test("Schalter zeigen den Zustand und drehen ihn um", async ({ page }) => {
 
 test("„unbekannt“ ist sichtbar unterscheidbar", async ({ page }) => {
   await fake.set({ gamerules: null });
-  await page.goto("/");
+  await page.goto("/regeln");
 
   await expect(page.getByTestId("rule-pvp-unknown")).toBeVisible();
   await expect(page.getByTestId("rule-pvp")).toBeVisible();

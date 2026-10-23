@@ -7,7 +7,7 @@ test.beforeEach(async () => {
 });
 
 test("Modal ausfüllen → die Kachel zeigt die neue Welt als aktiv", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/welten");
 
   const tile = page.getByTestId("place-2");
   await expect(tile).toContainText("Frei");
@@ -21,7 +21,7 @@ test("Modal ausfüllen → die Kachel zeigt die neue Welt als aktiv", async ({ p
   await modal.getByTestId("new-world-submit").click();
 
   // Nach dem Anlegen wird die neue Welt gleich geladen und ist aktiv.
-  await expect(page.getByTestId("active-world")).toHaveText("Bauwelt", { timeout: 10_000 });
+  await expect(tile.getByTestId("place-active")).toBeVisible({ timeout: 10_000 });
   await expect(tile).toContainText("Bauwelt");
   await expect(tile).toContainText("Flach");
   await expect(tile).toContainText("Überleben");
@@ -39,7 +39,7 @@ test("Modal ausfüllen → die Kachel zeigt die neue Welt als aktiv", async ({ p
 });
 
 test("Abbrechen legt keine Welt an", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/welten");
 
   await page.getByTestId("place-3").getByTestId("place-create").click();
   const modal = page.getByTestId("new-world-modal");
@@ -54,7 +54,7 @@ test("Abbrechen legt keine Welt an", async ({ page }) => {
 
 test("spielt gerade jemand, warnt das Modal und nennt die Spieler", async ({ page }) => {
   await fake.set({ players: ["Lena"] });
-  await page.goto("/");
+  await page.goto("/welten");
 
   await page.getByTestId("place-2").getByTestId("place-create").click();
 
@@ -66,13 +66,14 @@ test("nach dem Anlegen sind die Spielregeln bekannt, auch wenn der Server langsa
 }) => {
   // Wie auf dem echten Server: BSM meldet schnell „läuft“, Bedrock antwortet erst später.
   await fake.set({ startDelayMs: 500, outputDelayMs: 2000, gamerules: { keepInventory: "true" } });
-  await page.goto("/");
+  await page.goto("/welten");
 
   await page.getByTestId("place-2").getByTestId("place-create").click();
   await page.getByTestId("new-world-name").fill("Bauwelt");
   await page.getByTestId("new-world-submit").click();
 
-  await expect(page.getByTestId("active-world")).toHaveText("Bauwelt", { timeout: 10_000 });
+  await expect(page.getByTestId("place-2").getByTestId("place-active")).toBeVisible({ timeout: 10_000 });
+  await page.getByTestId("nav-regeln").click();
   await expect(page.getByTestId("rule-keepinventory")).toHaveAttribute("aria-checked", "true", {
     timeout: 10_000
   });
