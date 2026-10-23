@@ -1,0 +1,9 @@
+[Unit]
+Description=SMART-Werte der Systemplatte alle 30 Minuten auffrischen
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=30min
+
+[Install]
+WantedBy=timers.target

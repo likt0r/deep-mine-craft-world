@@ -10,6 +10,10 @@ export interface ServerFixture {
   backupDir: string;
   dataDir: string;
   outputFile: string;
+  /** Unterlegte /proc- und /sys-Dateien und SMART-Datei für den Bereich System */
+  procDir: string;
+  sysDir: string;
+  smartFile: string;
   /** Alles leeren und mit einer einzigen Welt neu anlegen. */
   reset(levelName?: string): void;
   addWorld(folder: string): void;
@@ -29,8 +33,17 @@ export function createServerFixture(root = mkdtempSync(join(tmpdir(), "dmc-"))):
     backupDir: join(root, "backups", "Bedrock"),
     dataDir: join(root, "deep-mine-control"),
     outputFile: join(serverDir, "server_output.txt"),
+    procDir: join(root, "proc"),
+    sysDir: join(root, "sys"),
+    smartFile: join(root, "deep-mine-control", "smart.json"),
     reset(levelName = DEFAULT_LEVEL_NAME) {
-      for (const dir of [fixture.serverDir, fixture.backupDir, fixture.dataDir]) {
+      for (const dir of [
+        fixture.serverDir,
+        fixture.backupDir,
+        fixture.dataDir,
+        fixture.procDir,
+        fixture.sysDir
+      ]) {
         rmSync(dir, { recursive: true, force: true });
         mkdirSync(dir, { recursive: true });
       }

@@ -13,7 +13,7 @@ BUILD_USER="${SUDO_USER:-root}"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq python3-venv caddy curl nodejs npm
+apt-get install -y -qq python3-venv caddy curl nodejs npm smartmontools
 # Das npm aus Ubuntu ist zu alt für unsere package-lock.json (npm 11).
 [ "$(npm -v | cut -d. -f1)" -ge 11 ] || npm install -g -q npm@11
 hash -r
@@ -40,12 +40,19 @@ if [ ! -f /etc/deep-mine-control.env ]; then
 fi
 install -m 644 "$HERE/server/deep-mine-control.service" /etc/systemd/system/deep-mine-control.service
 
+# SMART-Werte der Systemplatte für den Bereich System (smartctl braucht root)
+install -m 755 "$HERE/server/smart-status.sh" /usr/local/bin/deep-mine-smart-status
+install -m 644 "$HERE/server/deep-mine-smart.service" /etc/systemd/system/deep-mine-smart.service
+install -m 644 "$HERE/server/deep-mine-smart.timer" /etc/systemd/system/deep-mine-smart.timer
+
 # --- Caddy ---
 sed "s/HOST_IP/${HOST_IP}/g" "$HERE/server/Caddyfile" > /etc/caddy/Caddyfile
 
 systemctl daemon-reload
 systemctl enable --now bsm
 systemctl enable deep-mine-control
+systemctl enable --now deep-mine-smart.timer
+systemctl start deep-mine-smart.service
 systemctl restart deep-mine-control
 systemctl restart caddy
 
