@@ -3,9 +3,15 @@
 // Seite über `busy` im Status sieht, dass gerade etwas passiert.
 
 let running = false;
+/** Ziel des laufenden Weltwechsels (Laden, Anlegen), damit die Seite es zeigen kann. */
+let switching: WorldSwitch | null = null;
 
 export function isWorldOperationRunning(): boolean {
   return running;
+}
+
+export function currentWorldSwitch(): WorldSwitch | null {
+  return switching;
 }
 
 function claim() {
@@ -27,12 +33,17 @@ export async function runWorldOperation<T>(operation: () => Promise<T>): Promise
  * Startet einen langen Weltvorgang (Laden, Anlegen) im Hintergrund und kehrt sofort zurück.
  * Läuft schon einer: 409. Die Sperre gilt, bis der Vorgang fertig ist.
  */
-export function startWorldOperation(name: string, operation: () => Promise<void>): void {
+export function startWorldOperation(
+  target: { place: number; world: string },
+  operation: () => Promise<void>
+): void {
   claim();
+  switching = { ...target, phase: "countdown" };
   operation()
-    .catch((error) => console.error(`Weltvorgang „${name}“ fehlgeschlagen:`, error))
+    .catch((error) => console.error(`Weltvorgang „${target.world}“ fehlgeschlagen:`, error))
     .finally(() => {
       running = false;
+      switching = null;
     });
 }
 
@@ -49,6 +60,7 @@ export async function switchWorld(worldName: string, properties: Record<string, 
     await bsm.sendCommand(`say Gleich geht es nach „${worldName}“! Neustart in ${seconds} s.`);
     await sleep((seconds - (COUNTDOWN[i + 1] ?? 0)) * step);
   }
+  if (switching) switching.phase = "restart";
   await bsm.setProperties(properties);
   await bsm.restart();
 }

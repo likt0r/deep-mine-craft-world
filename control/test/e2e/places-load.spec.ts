@@ -28,10 +28,13 @@ test("ohne Spieler lädt „Diese Welt laden“ sofort, die Seite zeigt den Wech
   await page.getByTestId("place-load").click();
 
   await expect(page.getByTestId("place-sheet")).toBeHidden();
-  await expect(page.getByTestId("status-banner")).toHaveText("Welt wird gewechselt …");
+  // Leiste und Ziel-Platz zeigen, dass Bauwelt gerade kommt.
+  await expect(page.getByTestId("status-bar")).toContainText("Welt wird geladen: Bauwelt");
+  await expect(page.getByTestId("place-2").getByTestId("place-switching")).toContainText("Wird geladen …");
   await expect(page.getByTestId("controls")).toHaveAttribute("disabled");
   await expect(page.getByTestId("place-2").getByTestId("place-active")).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByTestId("status-banner")).toBeHidden();
+  await expect(page.getByTestId("place-2").getByTestId("place-switching")).toHaveCount(0);
+  await expect(page.getByTestId("status-bar")).toHaveAttribute("data-state", "running");
   await expect(page.getByTestId("place-1").getByTestId("place-active")).toHaveCount(0);
 });
 
@@ -61,4 +64,15 @@ test("die aktive Welt bietet weder Laden noch Löschen an", async ({ page }) => 
   await expect(page.getByTestId("place-sheet")).toContainText("Auf dieser Welt wird gerade gespielt.");
   await expect(page.getByTestId("place-load")).toHaveCount(0);
   await expect(page.getByTestId("place-delete")).toHaveCount(0);
+});
+
+test("die Karte auf Spielen zeigt den Wechsel", async ({ page }) => {
+  await fake.set({ startDelayMs: 4000 });
+  await page.goto("/");
+
+  await page.request.post("/api/places/2/load");
+
+  await expect(page.getByTestId("card-switching")).toContainText("Wechsel zu Bauwelt …");
+  await expect(page.getByTestId("active-world")).toHaveText("Bauwelt", { timeout: 10_000 });
+  await expect(page.getByTestId("card-switching")).toBeHidden();
 });

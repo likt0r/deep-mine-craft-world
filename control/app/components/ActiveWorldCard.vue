@@ -2,10 +2,18 @@
 const { status, refresh } = useServerStatus();
 const { places } = usePlaces();
 
+/** Dieselben Symbole wie bei den Spielmodus-Knöpfen */
+const MODE_ICONS: Record<string, string> = {
+  creative: "i-lucide-box",
+  survival: "i-lucide-heart",
+  adventure: "i-lucide-compass"
+};
+
 const active = computed(() => places.value?.places.find((p) => p.active));
 
 const badge = computed(() => {
-  if (status.value?.busy) return { label: "Welt wird gewechselt …", color: "warning" as const };
+  // Was gerade passiert, steht ausführlich darunter und in der Statusleiste.
+  if (status.value?.busy) return { label: "Wechselt …", color: "warning" as const };
   switch (status.value?.state) {
     case "running":
       return { label: "Läuft", color: "success" as const };
@@ -66,11 +74,34 @@ async function start() {
           {{ badge.label }}
         </UBadge>
         <template v-if="active?.world">
-          <UBadge color="neutral" variant="soft" size="lg">{{ worldTypeLabel(active.world.type) }}</UBadge>
-          <UBadge color="neutral" variant="soft" size="lg">{{ gameModeLabel(active.world.mode) }}</UBadge>
-          <UBadge color="neutral" variant="soft" size="lg">{{
-            difficultyLabel(active.world.difficulty)
-          }}</UBadge>
+          <!-- Symbole, weil Welttyp und Schwierigkeit beide „Normal“ heißen können. -->
+          <UBadge
+            color="neutral"
+            variant="soft"
+            size="lg"
+            :icon="active.world.type === 'flach' ? 'i-lucide-grid-2x2' : 'i-lucide-mountain'"
+            :title="`Welttyp ${worldTypeLabel(active.world.type)}`"
+          >
+            {{ worldTypeLabel(active.world.type) }}
+          </UBadge>
+          <UBadge
+            color="neutral"
+            variant="soft"
+            size="lg"
+            :icon="MODE_ICONS[active.world.mode] ?? 'i-lucide-gamepad-2'"
+            :title="`Spielmodus ${gameModeLabel(active.world.mode)}`"
+          >
+            {{ gameModeLabel(active.world.mode) }}
+          </UBadge>
+          <UBadge
+            color="neutral"
+            variant="soft"
+            size="lg"
+            icon="i-lucide-swords"
+            :title="`Schwierigkeit ${difficultyLabel(active.world.difficulty)}`"
+          >
+            {{ difficultyLabel(active.world.difficulty) }}
+          </UBadge>
         </template>
         <UBadge
           color="neutral"
@@ -82,6 +113,19 @@ async function start() {
         >
           {{ status?.players.length ?? 0 }} online
         </UBadge>
+      </div>
+
+      <div
+        v-if="status?.switching"
+        class="relative flex items-center gap-3 overflow-hidden rounded-lg border border-warning/40 bg-warning/10 px-3.5 pt-3 pb-4"
+        data-testid="card-switching"
+      >
+        <UIcon name="i-lucide-loader-circle" class="size-6 shrink-0 animate-spin text-warning" />
+        <div class="flex min-w-0 flex-col">
+          <p class="truncate font-semibold text-warning">Wechsel zu {{ status.switching.world }} …</p>
+          <p class="text-sm text-toned">{{ switchPhaseLabel(status.switching.phase) }}</p>
+        </div>
+        <span aria-hidden="true" class="switch-stripes absolute inset-x-0 bottom-0 h-1.5" />
       </div>
 
       <div

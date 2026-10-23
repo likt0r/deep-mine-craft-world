@@ -35,6 +35,8 @@ export interface FakeState {
    * erst abarbeitet, wenn es fertig geladen hat (BSM meldet da schon RUNNING).
    */
   outputDelayMs: number;
+  /** BSM ist kaputt: jede Anfrage an die Server-API antwortet mit 500. */
+  failing: boolean;
 }
 
 export interface FakeCall {
@@ -68,7 +70,8 @@ function initialState(): FakeState {
     gamerules: null,
     startDelayMs: 0,
     propertiesDelayMs: 0,
-    outputDelayMs: 0
+    outputDelayMs: 0,
+    failing: false
   };
 }
 
@@ -166,6 +169,8 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
 
     // Abgewiesene Anfragen erreichen BSM nicht und werden deshalb nicht mitgeschrieben.
     fake.calls.push({ method: req.method ?? "GET", path, body });
+
+    if (fake.state.failing) return bsmError(res, 500, "internal_error", "Internal Server Error");
 
     const prefix = `/api/server/${SERVER}/`;
     if (!path.startsWith(prefix)) return bsmError(res, 404, "not_found", "Not Found");
