@@ -16,6 +16,9 @@ export default defineNuxtConfig({
     sysDir: "/sys",
     /** `smartctl --json -x` der Systemplatte, geschrieben vom Timer deep-mine-smart (install.sh) */
     smartFile: "/var/lib/bsm/deep-mine-control/smart.json",
+    /** Rechner neu starten und ausschalten. Darf `bsm` per polkit (install.sh). Tests setzen harmlose Befehle. */
+    rebootCommand: "systemctl reboot",
+    poweroffCommand: "systemctl poweroff",
     /** Länge einer Countdown-Sekunde beim Weltwechsel. Tests setzen 0. */
     countdownStepMs: 1000,
     /** So lange wartet das Auslesen der Spielregeln auf die Ausgabe von `gamerule`. */

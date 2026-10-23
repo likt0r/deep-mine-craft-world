@@ -14,6 +14,9 @@ export interface ServerFixture {
   procDir: string;
   sysDir: string;
   smartFile: string;
+  /** Diese Dateien legen die Test-Befehle für Neustart und Ausschalten an. */
+  rebootMarker: string;
+  poweroffMarker: string;
   /** Alles leeren und mit einer einzigen Welt neu anlegen. */
   reset(levelName?: string): void;
   addWorld(folder: string): void;
@@ -36,6 +39,8 @@ export function createServerFixture(root = mkdtempSync(join(tmpdir(), "dmc-"))):
     procDir: join(root, "proc"),
     sysDir: join(root, "sys"),
     smartFile: join(root, "deep-mine-control", "smart.json"),
+    rebootMarker: join(root, "deep-mine-control", "reboot-called"),
+    poweroffMarker: join(root, "deep-mine-control", "poweroff-called"),
     reset(levelName = DEFAULT_LEVEL_NAME) {
       for (const dir of [
         fixture.serverDir,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 useSeoMeta({ title: "System · Deep Mine Control" });
 
-const { status, locked, refresh: refreshStatus } = useServerStatus();
+const { status, connection, locked, refresh: refreshStatus } = useServerStatus();
 const feedback = useFeedback();
 
 const { data: system, refresh } = useFetch<SystemInfo>("/api/system", { key: "system" });
@@ -44,10 +44,14 @@ const problems = computed(() => {
   return list;
 });
 
-async function restart() {
+/** Rechner neu starten oder ausschalten geht auch, wenn Minecraft aus ist, nur nicht ohne Verbindung oder mitten im Weltwechsel. */
+const powerLocked = computed(() => connection.value !== "ok" || !!status.value?.busy);
+
+/** Schickt eine der Aktionen und meldet sie als Toast. */
+async function act(path: string, message: string) {
   try {
-    await $fetch("/api/restart", { method: "POST" });
-    feedback.done("Minecraft startet neu …");
+    await $fetch(path, { method: "POST" });
+    feedback.done(message);
     await refreshStatus();
   } catch {
     feedback.failed();
@@ -179,18 +183,53 @@ async function restart() {
       </dl>
     </section>
 
-    <SystemCard title="Minecraft hängt?" icon="i-lucide-rotate-ccw">
-      <HoldButton
-        label="Minecraft neu starten"
-        icon="i-lucide-rotate-ccw"
-        color="warning"
-        data-testid="system-restart"
-        :disabled="locked"
-        @confirm="restart"
-      />
-      <span class="text-sm text-muted">
-        3 Sekunden gedrückt halten. Alle Spieler werden etwa eine halbe Minute getrennt.
-      </span>
-    </SystemCard>
+    <div class="grid gap-2.5 sm:grid-cols-2">
+      <SystemCard title="Minecraft" icon="i-lucide-box">
+        <HoldButton
+          label="Minecraft neu starten"
+          icon="i-lucide-rotate-ccw"
+          color="warning"
+          data-testid="system-restart"
+          :disabled="locked"
+          @confirm="act('/api/restart', 'Minecraft startet neu …')"
+        />
+        <HoldButton
+          label="Minecraft stoppen"
+          icon="i-lucide-square"
+          color="error"
+          data-testid="system-stop"
+          :disabled="locked"
+          @confirm="act('/api/stop', 'Minecraft wird gestoppt …')"
+        />
+        <span class="text-sm text-muted">
+          3 Sekunden gedrückt halten. Alle Spieler werden getrennt. Gestoppt kommt Minecraft mit „Server
+          starten“ wieder.
+        </span>
+      </SystemCard>
+
+      <SystemCard title="Rechner" icon="i-lucide-monitor">
+        <HoldButton
+          label="Rechner neu starten"
+          icon="i-lucide-refresh-cw"
+          color="warning"
+          data-testid="system-reboot"
+          :disabled="powerLocked"
+          @confirm="
+            act('/api/system/reboot', 'Rechner startet neu. In etwa einer Minute ist alles wieder da.')
+          "
+        />
+        <HoldButton
+          label="Rechner ausschalten"
+          icon="i-lucide-power"
+          color="error"
+          data-testid="system-poweroff"
+          :disabled="powerLocked"
+          @confirm="act('/api/system/poweroff', 'Rechner wird ausgeschaltet. Einschalten nur am Gerät.')"
+        />
+        <span class="text-sm text-muted">
+          3 Sekunden gedrückt halten. Ausgeschaltet geht der Rechner nur am Einschaltknopf wieder an.
+        </span>
+      </SystemCard>
+    </div>
   </UContainer>
 </template>
