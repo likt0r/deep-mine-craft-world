@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
     // Backups dieser Welt, benannt wie sie BSM anlegt. Backups anderer Welten bleiben.
     if (existsSync(config.bsmBackupDir)) {
       for (const file of readdirSync(config.bsmBackupDir)) {
-        if (file.startsWith(`${world.folder}_backup_`))
+        if (file.startsWith(backupPrefix(world.folder)))
           rmSync(join(config.bsmBackupDir, file), { recursive: true, force: true });
       }
     }

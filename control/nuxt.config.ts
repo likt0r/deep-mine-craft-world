@@ -31,6 +31,8 @@ export default defineNuxtConfig({
     ethernetDevice: "enp1s0",
     ipPath: "ip",
     resolvectlPath: "resolvectl",
+    /** Zum Entpacken von Backups (python3 -m zipfile) */
+    pythonPath: "python3",
     /** Länge einer Countdown-Sekunde beim Weltwechsel. Tests setzen 0. */
     countdownStepMs: 1000,
     /** So lange wartet das Auslesen der Spielregeln auf die Ausgabe von `gamerule`. */

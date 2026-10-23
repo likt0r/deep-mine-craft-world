@@ -38,7 +38,8 @@ In BSM beim Server `Bedrock`:
 - Autostart und Auto-Update an (Konsolen und Handys aktualisieren sich selbst, der Server muss mitziehen)
 - Seit BDS 26.30 ist `allow-list=true` voreingestellt: Spieler unter „Access Control“ → „Allowlist“ eintragen
 
-BSM behält 3 Backups und 3 heruntergeladene Bedrock-Versionen, vor jedem Start wird gesichert.
+BSM behält 3 Backups je Welt und 3 heruntergeladene Bedrock-Versionen. „Vor jedem Start sichern“ (BSM-Plugin
+`backup_on_start`) lässt sich in Deep Mine Control unter **System → Backups** schalten.
 
 ## Deep Mine Control
 
@@ -54,6 +55,15 @@ Die Tablet-Oberfläche unter http://192.168.0.110 hat vier Bereiche (Handy: Tabs
 
 Rechner neu starten und ausschalten darf Deep Mine Control (Benutzer `bsm`) über die polkit-Regel
 `/etc/polkit-1/rules.d/50-deep-mine-control.rules`, sonst nichts. Ausgeschaltet geht der Rechner nur am Gerät wieder an.
+
+## Backups
+
+Liegen als `.mcworld` in `/var/lib/bsm/data/backups/Bedrock/`, Name `<Weltordner>_backup_<JJJJMMTT>_<HHMMSS>_<id>.mcworld`.
+In Deep Mine Control (System → Backups): Liste je Welt, Jetzt sichern (nur die aktive Welt, so arbeitet BSM),
+Herunterladen, Zurückspielen (3 s halten). Die aktive Welt spielt BSM zurück (Server stoppt und startet); für
+andere Welten entpackt Deep Mine Control das Backup selbst in deren Ordner, denn **BSM spielt immer in die gerade
+aktive Welt zurück**. Damit Deep Mine Control `backup_on_start` schalten darf, gibt `install.sh` dem BSM-Konto
+`deep-mine-control` die Rolle admin.
 
 ## Ethernet
 

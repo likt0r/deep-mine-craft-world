@@ -34,13 +34,14 @@ export async function runWorldOperation<T>(operation: () => Promise<T>): Promise
  * Läuft schon einer: 409. Die Sperre gilt, bis der Vorgang fertig ist.
  */
 export function startWorldOperation(
-  target: { place: number; world: string },
+  /** Welt, die geladen wird (Laden, Anlegen). `null`: kein Weltwechsel, z. B. ein Backup zurückspielen. */
+  target: { place: number; world: string } | null,
   operation: () => Promise<void>
 ): void {
   claim();
-  switching = { ...target, phase: "countdown" };
+  switching = target ? { ...target, phase: "countdown" } : null;
   operation()
-    .catch((error) => console.error(`Weltvorgang „${target.world}“ fehlgeschlagen:`, error))
+    .catch((error) => console.error(`Weltvorgang „${target?.world ?? "Backup"}“ fehlgeschlagen:`, error))
     .finally(() => {
       running = false;
       switching = null;

@@ -1,4 +1,6 @@
-import { appendFileSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 
@@ -37,6 +39,12 @@ export interface FakeState {
   outputDelayMs: number;
   /** BSM ist kaputt: jede Anfrage an die Server-API antwortet mit 500. */
   failing: boolean;
+  /** Das BSM-Konto hat Admin-Rechte (sonst 403 auf /api/plugins). */
+  admin: boolean;
+  /** Plugins und ob sie an sind */
+  plugins: Record<string, boolean>;
+  /** Backup- und Restore-Aufgaben scheitern. */
+  tasksFail: boolean;
 }
 
 export interface FakeCall {
@@ -71,7 +79,10 @@ function initialState(): FakeState {
     startDelayMs: 0,
     propertiesDelayMs: 0,
     outputDelayMs: 0,
-    failing: false
+    failing: false,
+    admin: true,
+    plugins: { backup_on_start: false },
+    tasksFail: false
   };
 }
 
@@ -113,6 +124,32 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
     expireTokens: () => tokens.clear(),
     close: () => new Promise((resolve) => server.close(() => resolve()))
   };
+
+  /** Aufgaben (Backup, Restore). Erst „running“, dann fertig – oder gescheitert, wenn `tasksFail`. */
+  const tasks = new Map<
+    string,
+    { status: string; message: string; result: null; error: { message: string } | null }
+  >();
+  function startTask(restart = false): string {
+    const id = randomBytes(8).toString("hex");
+    tasks.set(id, { status: "running", message: "läuft", result: null, error: null });
+    void (async () => {
+      if (restart && !fake.state.tasksFail) await boot();
+      else await sleep(50);
+      tasks.set(
+        id,
+        fake.state.tasksFail
+          ? {
+              status: "failed",
+              message: "fehlgeschlagen",
+              result: null,
+              error: { message: "Fehler im Fake" }
+            }
+          : { status: "completed", message: "fertig", result: null, error: null }
+      );
+    })();
+    return id;
+  }
 
   async function boot() {
     // Wie BSM: Bei jedem Start beginnt die Ausgabedatei neu.
@@ -172,6 +209,30 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
 
     if (fake.state.failing) return bsmError(res, 500, "internal_error", "Internal Server Error");
 
+    // --- Aufgaben und Plugins (außerhalb von /api/server/…) ---
+    const taskMatch = path.match(/^\/api\/tasks\/status\/(.+)$/);
+    if (taskMatch && req.method === "GET") {
+      const task = tasks.get(taskMatch[1]!);
+      return task
+        ? send(res, 200, { id: taskMatch[1], ...task })
+        : bsmError(res, 404, "not_found", "Task not found");
+    }
+    if (path === "/api/plugins" && req.method === "GET") {
+      if (!fake.state.admin) return bsmError(res, 403, "forbidden", "Admin privileges required");
+      return send(res, 200, {
+        status: "success",
+        plugins: Object.fromEntries(
+          Object.entries(fake.state.plugins).map(([name, enabled]) => [name, { enabled }])
+        )
+      });
+    }
+    const pluginMatch = path.match(/^\/api\/plugins\/([^/]+)$/);
+    if (pluginMatch && req.method === "POST") {
+      if (!fake.state.admin) return bsmError(res, 403, "forbidden", "Admin privileges required");
+      fake.state.plugins[pluginMatch[1]!] = (body as { enabled: boolean }).enabled;
+      return send(res, 200, { status: "success", message: "ok" });
+    }
+
     const prefix = `/api/server/${SERVER}/`;
     if (!path.startsWith(prefix)) return bsmError(res, 404, "not_found", "Not Found");
     const action = `${req.method} ${path.slice(prefix.length)}`;
@@ -186,6 +247,23 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
           player_count: fake.state.players.length,
           players: fake.state.players.map((name, i) => ({ name, xuid: String(1000 + i) }))
         });
+      case "POST backup/action": {
+        // Wie BSM: <Ordner der aktiven Welt>_backup_<Zeit>_<hex>.mcworld im Backup-Ordner.
+        const level = fake.state.properties["level-name"] ?? "";
+        const stamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "_").slice(0, 15);
+        const name = `${level.replace(/[:"/\\|?*]/g, "_")}_backup_${stamp}_${randomBytes(4).toString("hex")}.mcworld`;
+        mkdirSync(fixture.backupDir, { recursive: true });
+        if (!fake.state.tasksFail) writeFileSync(join(fixture.backupDir, name), "fake mcworld");
+        return send(res, 202, { status: "accepted", message: "ok", task_id: startTask() });
+      }
+      case "POST restore/action": {
+        const file = (body as { backup_file?: string } | null)?.backup_file ?? "";
+        if (!existsSync(join(fixture.backupDir, file)))
+          return bsmError(res, 404, "not_found", `Backup file not found: ${file}`);
+        // BSM stoppt den Server, spielt zurück und startet ihn wieder.
+        const id = startTask(true);
+        return send(res, 202, { status: "accepted", message: "ok", task_id: id });
+      }
       case "POST stop":
         fake.state.status = "STOPPED";
         return send(res, 200, { status: "success", server_name: SERVER, message: "ok" });

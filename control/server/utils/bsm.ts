@@ -8,6 +8,13 @@ interface BsmSummary {
   players: { name: string; xuid: string }[];
 }
 
+/** Hintergrundaufgabe in BSM (Backup, Restore). */
+interface BsmTask {
+  status: "queued" | "running" | "completed" | "failed" | "cancelling" | "cancelled";
+  message: string;
+  error?: { message?: string } | null;
+}
+
 interface BsmProperties {
   properties: Record<string, string>;
 }
@@ -74,6 +81,23 @@ export const bsm = {
   sendCommand: (command: string) =>
     bsmFetch(serverPath("send_command"), { method: "POST", body: { command } }),
   getProperties: async () => (await bsmFetch<BsmProperties>(serverPath("properties/get"))).properties,
+  /** Sichert die aktive Welt (Aufgabe im Hintergrund). */
+  backupWorld: () =>
+    bsmFetch<{ task_id: string }>(serverPath("backup/action"), {
+      method: "POST",
+      body: { backup_type: "world" }
+    }),
+  /** Spielt ein Backup in die aktive Welt zurück; BSM stoppt und startet den Server dafür. */
+  restoreWorld: (backupFile: string) =>
+    bsmFetch<{ task_id: string }>(serverPath("restore/action"), {
+      method: "POST",
+      body: { restore_type: "world", backup_file: backupFile }
+    }),
+  taskStatus: (taskId: string) => bsmFetch<BsmTask>(`/api/tasks/status/${encodeURIComponent(taskId)}`),
+  /** Plugins lesen und schalten darf nur ein BSM-Admin. */
+  plugins: () => bsmFetch<{ plugins?: Record<string, { enabled?: boolean }> }>("/api/plugins"),
+  setPlugin: (name: string, enabled: boolean) =>
+    bsmFetch(`/api/plugins/${encodeURIComponent(name)}`, { method: "POST", body: { enabled } }),
   /** Schreibt nur server.properties. Wirksam wird es erst nach `restart()`. */
   setProperties: (properties: Record<string, string>) =>
     bsmFetch(serverPath("properties/set"), { method: "POST", body: { properties } })

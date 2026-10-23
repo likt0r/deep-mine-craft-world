@@ -81,6 +81,18 @@ install -m 644 "$HERE/server/deep-mine-smart.timer" /etc/systemd/system/deep-min
 # --- Caddy ---
 sed "s/HOST_IP/${HOST_IP}/g" "$HERE/server/Caddyfile" > /etc/caddy/Caddyfile
 
+# Deep Mine Control schaltet „Vor jedem Start sichern“ (BSM-Plugin backup_on_start). Das darf nur ein BSM-Admin.
+# Deep Mine Control selbst bietet weiterhin nur feste Aktionen an.
+BSM_DB=/var/lib/bsm/config/bedrock-server-manager.db
+if [ -f "$BSM_DB" ]; then
+  sudo -u bsm /opt/bsm/.venv/bin/python - "$BSM_DB" <<'PY'
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+db.execute("update users set role = 'admin' where username = 'deep-mine-control'")
+db.commit()
+PY
+fi
+
 systemctl daemon-reload
 systemctl enable --now bsm
 systemctl enable deep-mine-control
