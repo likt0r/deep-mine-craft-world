@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Markiert wird der ganze Bereich (router-link-active), damit System auch unter /system/wlan leuchtet.
+// Markiert wird der ganze Bereich (router-link-active), damit System auch unter /system/netzwerk leuchtet.
 const AREAS = [
   { to: "/", label: "Spielen", icon: "i-lucide-gamepad-2" },
   { to: "/welten", label: "Welten", icon: "i-lucide-layers" },

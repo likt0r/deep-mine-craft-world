@@ -33,6 +33,11 @@ export default defineNuxtConfig({
     rulesWaitMs: 15000
   },
 
+  // Der Unterbereich hieß früher WLAN.
+  routeRules: {
+    "/system/wlan": { redirect: "/system/netzwerk" }
+  },
+
   devtools: { enabled: true },
 
   css: ["~/assets/css/main.css"],

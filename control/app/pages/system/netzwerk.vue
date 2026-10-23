@@ -1,5 +1,5 @@
 <script setup lang="ts">
-useSeoMeta({ title: "WLAN · Deep Mine Control" });
+useSeoMeta({ title: "Netzwerk · Deep Mine Control" });
 
 const { locked, refresh: refreshStatus } = useServerStatus();
 const feedback = useFeedback();
