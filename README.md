@@ -91,8 +91,15 @@ importiert sie mit `nmcli connection import type wireguard` als Verbindung `dmc-
 und löscht die Datei gleich wieder; der private Schlüssel liegt danach nur bei NetworkManager. Die nicht geheimen
 Angaben für die Anzeige stehen in `/var/lib/bsm/deep-mine-control/vpn.json`. NetworkManager verwaltet dafür
 WireGuard-Geräte mit (`except:type:wireguard`). `PreUp`/`PostUp` & Co. werden abgelehnt (NetworkManager führt sie
-nicht aus). Leitet die Konfiguration allen Verkehr durchs VPN (`AllowedIPs = 0.0.0.0/0`), warnt die Seite: Fällt das
-VPN aus, hat der Server kein Internet.
+nicht aus).
+
+- VPN-Routen haben Metrik 1000, das Kabel (networkd) 100: Gibt das VPN eine Adresse im Heimnetz (FritzBox:
+  `192.168.0.205/24`), behält zuhause das Kabel die Route ins Heimnetz. Ohne das war der Server im Heimnetz nicht
+  mehr erreichbar.
+- „Gesamten Internetverkehr durchs VPN“ ist standardmäßig **aus** (`ipv4/ipv6.never-default yes`): Nur das Netz
+  hinter dem VPN läuft hindurch. Gedacht ist das VPN dafür, den Server von zuhause unter seiner VPN-Adresse zu
+  erreichen, wenn er woanders steht.
+- Rettung, falls das Netz doch einmal hakt: ins WLAN `MINECRAFT-World`, `http://10.42.0.1/system/netzwerk`, VPN aus.
 
 ## WLAN
 

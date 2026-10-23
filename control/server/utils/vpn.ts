@@ -9,7 +9,14 @@ const run = promisify(execFile);
 export const VPN_PROFILE = "dmc-vpn";
 
 /** Was die Seite anzeigt, ohne Schlüssel. Wird beim Hochladen aus der Konfiguration gelesen. */
-type VpnMeta = Pick<VpnInfo, "address" | "endpoints" | "dns" | "fullTunnel">;
+type VpnMeta = Pick<VpnInfo, "address" | "endpoints" | "dns" | "allowsAll">;
+
+/**
+ * VPN-Routen haben weniger Vorrang als das Kabel (networkd: Metrik 100). Sonst übernimmt ein VPN, das eine
+ * Adresse im Heimnetz vergibt (FritzBox: 192.168.0.x/24), zuhause die Route ins Heimnetz, und der Server ist
+ * im Heimnetz nicht mehr erreichbar.
+ */
+const ROUTE_METRIC = "1000";
 
 const KEY = /^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw480]=$/;
 const INTERFACE_KEYS = ["PrivateKey", "Address", "DNS", "ListenPort", "MTU"];
@@ -64,7 +71,7 @@ export function parseWireguard(text: string): VpnMeta {
     address: list(iface.Address),
     endpoints: peers.map((p) => p.values.Endpoint!),
     dns: list(iface.DNS),
-    fullTunnel: allowedIps.some((ip) => ip === "0.0.0.0/0" || ip === "::/0")
+    allowsAll: allowedIps.some((ip) => ip === "0.0.0.0/0" || ip === "::/0")
   };
 }
 
@@ -98,22 +105,27 @@ export async function readVpn(): Promise<VpnInfo> {
       address: [],
       endpoints: [],
       dns: [],
-      fullTunnel: false
+      allowsAll: false,
+      routeAll: false
     };
-  const [autoconnect, meta] = await Promise.all([
-    nmcli("-g", "connection.autoconnect", "connection", "show", VPN_PROFILE),
+  const [settings, meta] = await Promise.all([
+    nmcli("-g", "connection.autoconnect,ipv4.never-default", "connection", "show", VPN_PROFILE),
     readFile(metaFile(), "utf8")
       .then((t) => JSON.parse(t) as VpnMeta)
       .catch(() => null)
   ]);
+  const [autoconnect, neverDefault] = settings.split("\n").map((line) => line.trim());
+  const allowsAll = meta?.allowsAll ?? false;
   return {
     configured: true,
     active: device !== null,
-    autoconnect: autoconnect.trim() === "yes",
+    autoconnect: autoconnect === "yes",
     address: meta?.address ?? [],
     endpoints: meta?.endpoints ?? [],
     dns: meta?.dns ?? [],
-    fullTunnel: meta?.fullTunnel ?? false
+    allowsAll,
+    // never-default an heißt: keine Standardroute durchs VPN.
+    routeAll: allowsAll && neverDefault !== "yes"
   };
 }
 
@@ -121,7 +133,7 @@ export async function readVpn(): Promise<VpnInfo> {
  * Importiert eine geprüfte Konfiguration als `dmc-vpn` (ersetzt eine alte) und verbindet im Hintergrund. Die
  * Datei mit dem privaten Schlüssel liegt nur für den Import im Datenordner und wird gleich wieder gelöscht.
  */
-export async function importVpn(text: string, autoconnect: boolean): Promise<void> {
+export async function importVpn(text: string, autoconnect: boolean, routeAll: boolean): Promise<void> {
   const meta = parseWireguard(text);
   const file = join(useRuntimeConfig().dataDir, `${VPN_PROFILE}.conf`);
   if ((await profileDevice()) !== undefined) await nmcli("connection", "delete", VPN_PROFILE);
@@ -131,7 +143,18 @@ export async function importVpn(text: string, autoconnect: boolean): Promise<voi
   } finally {
     await rm(file, { force: true });
   }
-  await nmcli("connection", "modify", VPN_PROFILE, "connection.autoconnect", autoconnect ? "yes" : "no");
+  await nmcli(
+    "connection",
+    "modify",
+    VPN_PROFILE,
+    "connection.autoconnect",
+    autoconnect ? "yes" : "no",
+    "ipv4.route-metric",
+    ROUTE_METRIC,
+    "ipv6.route-metric",
+    ROUTE_METRIC,
+    ...neverDefault(routeAll)
+  );
   await writeFile(metaFile(), JSON.stringify(meta) + "\n");
   connectVpn(true);
 }
@@ -141,6 +164,18 @@ export function connectVpn(active: boolean): void {
   nmcli("connection", active ? "up" : "down", VPN_PROFILE).catch((error) =>
     console.error(`VPN ${active ? "verbinden" : "trennen"} fehlgeschlagen:`, error)
   );
+}
+
+/** Ohne Standardroute (never-default) läuft kein Internetverkehr durchs VPN. */
+function neverDefault(routeAll: boolean): string[] {
+  const value = routeAll ? "no" : "yes";
+  return ["ipv4.never-default", value, "ipv6.never-default", value];
+}
+
+/** Gesamten Internetverkehr durchs VPN an oder aus. Eine aktive Verbindung wird dafür neu aufgebaut. */
+export async function setVpnRouteAll(routeAll: boolean): Promise<void> {
+  await nmcli("connection", "modify", VPN_PROFILE, ...neverDefault(routeAll));
+  if ((await profileDevice()) !== null) connectVpn(true);
 }
 
 export async function setVpnAutoconnect(enabled: boolean): Promise<void> {

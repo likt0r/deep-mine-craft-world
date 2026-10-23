@@ -104,13 +104,13 @@ if (args[0] === "connection" && args[1] === "import" && args[3] === "wireguard" 
 
 if (
   args[0] === "-g" &&
-  args[1] === "connection.autoconnect" &&
+  args[1] === "connection.autoconnect,ipv4.never-default" &&
   args[2] === "connection" &&
   args[3] === "show"
 ) {
   const c = find(args[4]);
   if (!c) fail(10, `${args[4]} - no such connection profile.`);
-  out(c.autoconnect ?? "yes");
+  out(`${c.autoconnect ?? "yes"}\n${c.neverDefault4 ?? "no"}`);
 }
 
 if (
@@ -173,6 +173,10 @@ if (args[0] === "connection" && args[1] === "modify") {
   if (p["802-11-wireless.ssid"]) c.ssid = p["802-11-wireless.ssid"];
   if (p["wifi-sec.psk"]) c.psk = p["wifi-sec.psk"];
   if (p["connection.autoconnect"]) c.autoconnect = p["connection.autoconnect"];
+  if (p["ipv4.never-default"]) c.neverDefault4 = p["ipv4.never-default"];
+  if (p["ipv6.never-default"]) c.neverDefault6 = p["ipv6.never-default"];
+  if (p["ipv4.route-metric"]) c.metric4 = p["ipv4.route-metric"];
+  if (p["ipv6.route-metric"]) c.metric6 = p["ipv6.route-metric"];
   out("");
 }
 
