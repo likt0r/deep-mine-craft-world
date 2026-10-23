@@ -1,29 +1,29 @@
 <script setup lang="ts">
 const MODES = [
-  { value: "creative", label: "Kreativ" },
-  { value: "survival", label: "Überleben" },
-  { value: "adventure", label: "Abenteuer" }
+  { value: "creative", label: "Kreativ", icon: "i-lucide-box" },
+  { value: "survival", label: "Überleben", icon: "i-lucide-heart" },
+  { value: "adventure", label: "Abenteuer", icon: "i-lucide-compass" }
 ] as const;
 
 const { places } = usePlaces();
-
+const feedback = useFeedback();
 const sending = ref(false);
-const toast = useToast();
 
 const currentMode = computed(() => {
   const active = places.value?.places.find((p) => p.active);
   return active?.world?.mode ?? "";
 });
 
-async function setMode(mode: string) {
+async function setMode(mode: (typeof MODES)[number]) {
   if (sending.value) return;
   sending.value = true;
   try {
-    await $fetch("/api/gamemode", { method: "POST", body: { mode } });
+    await $fetch("/api/gamemode", { method: "POST", body: { mode: mode.value } });
     await refreshNuxtData("places");
     await refreshNuxtData("status");
+    feedback.done(`Spielmodus: ${mode.label}.`);
   } catch {
-    toast.add({ title: "Das hat nicht geklappt. Versuch es nochmal.", color: "error", icon: "i-lucide-x" });
+    feedback.failed();
   } finally {
     sending.value = false;
   }
@@ -31,19 +31,21 @@ async function setMode(mode: string) {
 </script>
 
 <template>
-  <section class="flex flex-col gap-3" data-testid="gamemode">
-    <h2 class="text-xl font-semibold">Spielmodus</h2>
-    <div class="flex flex-wrap gap-2">
+  <section class="flex flex-col gap-2.5" data-testid="gamemode" aria-labelledby="gamemode-heading">
+    <h2 id="gamemode-heading" class="font-pixel text-xl font-semibold text-highlighted">Spielmodus</h2>
+    <div class="grid grid-cols-3 gap-2">
       <UButton
         v-for="mode in MODES"
         :key="mode.value"
         :data-testid="`gamemode-${mode.value}`"
-        :variant="currentMode === mode.value ? 'solid' : 'outline'"
+        :color="currentMode === mode.value ? 'primary' : 'neutral'"
+        :variant="currentMode === mode.value ? 'solid' : 'subtle'"
         :aria-pressed="currentMode === mode.value"
-        size="xl"
         :disabled="sending"
-        @click="setMode(mode.value)"
+        class="block-btn h-19 flex-col justify-center gap-1.5 text-base font-semibold"
+        @click="setMode(mode)"
       >
+        <UIcon :name="mode.icon" class="size-6" />
         {{ mode.label }}
       </UButton>
     </div>

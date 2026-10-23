@@ -1,2 +1,77 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+
+/* Schriften liegen in der App, die Seite lädt nichts aus dem Internet (nur LAN). */
+@import "@fontsource/public-sans/latin-400.css";
+@import "@fontsource/public-sans/latin-500.css";
+@import "@fontsource/public-sans/latin-600.css";
+@import "@fontsource/public-sans/latin-700.css";
+@import "@fontsource/pixelify-sans/latin-500.css";
+@import "@fontsource/pixelify-sans/latin-600.css";
+@import "@fontsource/pixelify-sans/latin-700.css";
+
+@theme {
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  /* Pixel-Schrift für Überschriften und Tab-Beschriftungen */
+  --font-pixel: "Pixelify Sans", ui-sans-serif, sans-serif;
+}
+
+/* Dunkler Stein-Grund wie im Design: Seite stone-950, Karten stone-900, Flächen stone-800. */
+.dark {
+  --ui-bg: var(--ui-color-neutral-950);
+  --ui-bg-muted: var(--ui-color-neutral-900);
+  --ui-bg-elevated: var(--ui-color-neutral-800);
+  --ui-bg-accented: var(--ui-color-neutral-700);
+  --ui-border: var(--ui-color-neutral-800);
+  --ui-border-muted: var(--ui-color-neutral-800);
+  --ui-border-accented: var(--ui-color-neutral-700);
+}
+
+@layer components {
+  /* Knöpfe wie Blöcke: dunkle Kante unten, beim Drücken sinkt der Block ein. */
+  .block-btn {
+    box-shadow: inset 0 -4px 0 rgb(0 0 0 / 0.35);
+  }
+  .block-btn:not(:disabled):active {
+    box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.35);
+    transform: translateY(2px);
+  }
+
+  /* Gras- und Erdkante über der Karte der aktiven Welt */
+  .grass-edge {
+    height: 8px;
+    background-color: #22c55e;
+    background-image: linear-gradient(
+      90deg,
+      #4ade80 0% 25%,
+      #16a34a 25% 32%,
+      #22c55e 32% 58%,
+      #4ade80 58% 80%,
+      #16a34a 80% 86%,
+      #22c55e 86% 100%
+    );
+    background-size: 48px 8px;
+  }
+  .dirt-edge {
+    height: 6px;
+    background-color: #78350f;
+    background-image: linear-gradient(
+      90deg,
+      #92400e 0% 30%,
+      #78350f 30% 62%,
+      #a16207 62% 70%,
+      #78350f 70% 100%
+    );
+    background-size: 40px 6px;
+  }
+
+  /* Ein Grasblock als Symbol */
+  .grass-block {
+    border-radius: 8px;
+    background-color: #92400e;
+    background-image:
+      linear-gradient(180deg, #4ade80 0% 22%, #22c55e 22% 34%, transparent 34%),
+      linear-gradient(90deg, transparent 0% 20%, #78350f 20% 32%, transparent 32% 64%, #a16207 64% 74%, transparent 74%);
+    box-shadow: inset 0 -5px 0 rgb(0 0 0 / 0.3);
+  }
+}

@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { fake } from "./fake";
+import { toast } from "./toast";
 
 test.beforeEach(async () => {
   await fake.reset();
@@ -31,6 +32,7 @@ test("Spielmodus und Schwierigkeit sind hervorgehoben und ein Tipp ändert sie",
 
   await survival.click();
   await expect(survival).toHaveAttribute("aria-pressed", "true");
+  await expect(toast(page, "Spielmodus: Überleben.")).toBeVisible();
   await expect(creative).toHaveAttribute("aria-pressed", "false");
 
   const peaceful = page.getByTestId("difficulty-peaceful");
@@ -47,6 +49,7 @@ test("Spielmodus und Schwierigkeit sind hervorgehoben und ein Tipp ändert sie",
 
   await hard.click();
   await expect(hard).toHaveAttribute("aria-pressed", "true");
+  await expect(toast(page, "Schwierigkeit: Schwer.")).toBeVisible();
   await expect(easy).toHaveAttribute("aria-pressed", "false");
 
   const own = (await fake.commands()).filter((c) => /^(gamemode|difficulty) /.test(c));

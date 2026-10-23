@@ -11,6 +11,11 @@ export default defineNuxtConfig({
     bsmServerDir: "/var/lib/bsm/data/servers/Bedrock",
     bsmBackupDir: "/var/lib/bsm/data/backups/Bedrock",
     dataDir: "/var/lib/bsm/deep-mine-control",
+    /** Für den Bereich System. Tests legen eigene Dateien unter. */
+    procDir: "/proc",
+    sysDir: "/sys",
+    /** `smartctl --json -x` der Systemplatte, geschrieben vom Timer deep-mine-smart (install.sh) */
+    smartFile: "/var/lib/bsm/deep-mine-control/smart.json",
     /** Länge einer Countdown-Sekunde beim Weltwechsel. Tests setzen 0. */
     countdownStepMs: 1000,
     /** So lange wartet das Auslesen der Spielregeln auf die Ausgabe von `gamerule`. */
