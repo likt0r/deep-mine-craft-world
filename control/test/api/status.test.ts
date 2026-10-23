@@ -20,7 +20,8 @@ describe("GET /api/status", () => {
       state: "running",
       world: "Pandaland",
       players: ["Lena", "Tom"],
-      busy: false
+      busy: false,
+      switching: null
     });
   });
 
@@ -44,6 +45,15 @@ describe("GET /api/status", () => {
     const res = await h.request("/api/status");
 
     expect(res.body.state).toBe(state);
+  });
+
+  it("antwortet BSM nicht, kommt 503 mit Grund „bsm“", async () => {
+    h.fake.state.failing = true;
+
+    const res = await h.request("/api/status");
+
+    expect(res.status).toBe(503);
+    expect(res.body.data).toEqual({ reason: "bsm" });
   });
 
   it("meldet sich nach abgelaufenem Token einmal neu an und wiederholt die Anfrage", async () => {

@@ -1,5 +1,9 @@
 <script setup lang="ts">
 const { places } = usePlaces();
+const { status } = useServerStatus();
+
+/** Platz, auf dem gerade eine Welt geladen wird, sonst null. */
+const switching = computed(() => status.value?.switching ?? null);
 
 /** Platz, dessen Aktionsmenü offen ist, sonst null. */
 const selected = ref<number | null>(null);
@@ -19,13 +23,15 @@ function tileClass(entry: Place) {
         <button
           type="button"
           data-testid="place-open"
-          class="flex min-h-17 w-full items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-left transition-transform active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+          class="relative flex min-h-17 w-full items-center gap-3 overflow-hidden rounded-xl border-2 px-3 py-2.5 text-left transition-transform active:translate-y-px disabled:cursor-not-allowed"
           :class="
-            entry.world
-              ? entry.active
-                ? 'border-primary bg-primary/10'
-                : 'border-default bg-muted'
-              : 'border-dashed border-accented bg-transparent text-muted'
+            switching?.place === entry.place
+              ? 'border-warning bg-warning/10'
+              : entry.world
+                ? entry.active
+                  ? 'border-primary bg-primary/10 disabled:opacity-50'
+                  : 'border-default bg-muted disabled:opacity-50'
+                : 'border-dashed border-accented bg-transparent text-muted disabled:opacity-50'
           "
           @click="selected = entry.place"
         >
@@ -38,7 +44,18 @@ function tileClass(entry: Place) {
           </span>
           <span class="sr-only">Platz {{ entry.place }}</span>
 
-          <template v-if="entry.world">
+          <!-- Hier kommt gerade die Welt hin: Laden oder Anlegen läuft. -->
+          <template v-if="switching?.place === entry.place">
+            <span class="flex min-w-0 flex-1 flex-col" data-testid="place-switching">
+              <span class="truncate text-lg font-bold text-highlighted">{{ switching.world }}</span>
+              <span class="text-sm font-semibold text-warning">
+                Wird geladen … · {{ switchPhaseLabel(switching.phase) }}
+              </span>
+            </span>
+            <UIcon name="i-lucide-loader-circle" class="size-6 shrink-0 animate-spin text-warning" />
+            <span aria-hidden="true" class="switch-stripes absolute inset-x-0 bottom-0 h-1.5" />
+          </template>
+          <template v-else-if="entry.world">
             <span class="flex min-w-0 flex-1 flex-col">
               <span class="truncate text-lg font-bold text-highlighted">{{ entry.world.name }}</span>
               <span class="text-sm text-muted">

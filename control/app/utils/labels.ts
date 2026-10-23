@@ -29,3 +29,12 @@ export function worldTypeLabel(type: string): string {
 export function difficultyLabel(difficulty: string): string {
   return DIFFICULTIES[difficulty] ?? difficulty;
 }
+
+const SWITCH_PHASES: Record<WorldSwitch["phase"], string> = {
+  countdown: "Countdown im Spiel",
+  restart: "Server startet neu"
+};
+
+export function switchPhaseLabel(phase: WorldSwitch["phase"]): string {
+  return SWITCH_PHASES[phase];
+}

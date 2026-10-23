@@ -21,7 +21,7 @@ useStatusPolling();
     <AppNav />
     <!-- Platz für die Tab-Leiste unten (Handy) bzw. die Seitenleiste links (ab Tablet). -->
     <UMain class="pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0 md:pl-28">
-      <StatusBanner />
+      <StatusBar />
       <NuxtPage />
     </UMain>
   </UApp>

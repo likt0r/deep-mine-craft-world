@@ -7,7 +7,7 @@ export function useWorldLoad() {
     try {
       await $fetch(`/api/places/${place}/load`, { method: "POST" });
       feedback.done(`${name} wird geladen …`);
-      // Der Status zeigt sofort „Welt wird gewechselt …“ und sperrt die Knöpfe.
+      // Der Status zeigt sofort den Wechsel und sperrt die Knöpfe.
       await refresh();
       return true;
     } catch {

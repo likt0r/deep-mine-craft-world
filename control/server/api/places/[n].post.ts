@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
   };
 
   // Wie beim Laden im Hintergrund: die Antwort kommt sofort, die Seite folgt über `busy`.
-  startWorldOperation(world.name, async () => {
+  startWorldOperation({ place: Number(place), world: world.name }, async () => {
     // Erst unter der Sperre eintragen, damit bei einem gleichzeitigen Weltvorgang (409) nichts liegen bleibt.
     await setStoredWorld(Number(place), world);
     await switchWorld(world.name, {
