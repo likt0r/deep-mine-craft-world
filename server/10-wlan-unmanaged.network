@@ -1,0 +1,6 @@
+# systemd-networkd lässt das WLAN los, das verwaltet NetworkManager (Deep Mine Control, Bereich System → WLAN).
+[Match]
+Name=wl*
+
+[Link]
+Unmanaged=yes

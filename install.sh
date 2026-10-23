@@ -12,8 +12,17 @@ BUILD_USER="${SUDO_USER:-root}"
 [ "$(id -u)" -eq 0 ] || { echo "Bitte mit sudo ausführen." >&2; exit 1; }
 
 export DEBIAN_FRONTEND=noninteractive
+
+# --- WLAN, Teil 1: vor der Paketinstallation ---
+# NetworkManager darf beim ersten Start nur das WLAN anfassen, Ethernet (SSH!) bleibt bei networkd.
+install -d /etc/NetworkManager/conf.d
+install -m 644 "$HERE/server/networkmanager-deep-mine.conf" /etc/NetworkManager/conf.d/90-deep-mine.conf
+install -m 644 "$HERE/server/10-wlan-unmanaged.network" /etc/systemd/network/10-wlan-unmanaged.network
+install -m 644 "$HERE/server/wlan-regdom.conf" /etc/modprobe.d/deep-mine-wlan.conf
+networkctl reload
+
 apt-get update -qq
-apt-get install -y -qq python3-venv caddy curl nodejs npm smartmontools
+apt-get install -y -qq python3-venv caddy curl nodejs npm smartmontools network-manager dnsmasq-base iw
 # Das npm aus Ubuntu ist zu alt für unsere package-lock.json (npm 11).
 [ "$(npm -v | cut -d. -f1)" -ge 11 ] || npm install -g -q npm@11
 hash -r
@@ -43,6 +52,22 @@ install -m 644 "$HERE/server/deep-mine-control.service" /etc/systemd/system/deep
 # Deep Mine Control (bsm) darf den Rechner neu starten und ausschalten (Bereich System)
 install -m 644 "$HERE/server/50-deep-mine-control.rules" /etc/polkit-1/rules.d/50-deep-mine-control.rules
 
+# --- WLAN, Teil 2: eigenes WLAN (AP) als Rückfall ---
+# Das Profil nur anlegen, wenn es fehlt: Name und Passwort aus Deep Mine Control bleiben erhalten.
+iw reg set DE || true
+systemctl enable --now NetworkManager
+if ! nmcli -t -f NAME connection show | grep -qx dmc-ap; then
+  nmcli connection add type wifi ifname wlp3s0 con-name dmc-ap ssid MINECRAFT-World \
+    802-11-wireless.mode ap 802-11-wireless.band bg ipv4.method shared \
+    wifi-sec.key-mgmt wpa-psk wifi-sec.psk deep-mine-craft \
+    connection.autoconnect yes connection.autoconnect-priority -100
+fi
+# Nur WPA2 (CCMP): sicherer als gemischt mit WPA1, und Konsolen kommen damit am besten klar.
+nmcli connection modify dmc-ap wifi-sec.proto rsn wifi-sec.pairwise ccmp wifi-sec.group ccmp
+install -m 755 "$HERE/server/wifi-check.sh" /usr/local/bin/deep-mine-wifi-check
+install -m 644 "$HERE/server/deep-mine-wifi-check.service" /etc/systemd/system/deep-mine-wifi-check.service
+install -m 644 "$HERE/server/deep-mine-wifi-check.timer" /etc/systemd/system/deep-mine-wifi-check.timer
+
 # SMART-Werte der Systemplatte für den Bereich System (smartctl braucht root)
 install -m 755 "$HERE/server/smart-status.sh" /usr/local/bin/deep-mine-smart-status
 install -m 644 "$HERE/server/deep-mine-smart.service" /etc/systemd/system/deep-mine-smart.service
@@ -55,6 +80,7 @@ systemctl daemon-reload
 systemctl enable --now bsm
 systemctl enable deep-mine-control
 systemctl enable --now deep-mine-smart.timer
+systemctl enable --now deep-mine-wifi-check.timer
 systemctl start deep-mine-smart.service
 systemctl restart deep-mine-control
 systemctl restart caddy

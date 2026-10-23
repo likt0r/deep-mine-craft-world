@@ -48,10 +48,24 @@ Die Tablet-Oberfläche unter http://192.168.0.110 hat vier Bereiche (Handy: Tabs
 - **Welten:** 10 Plätze für Welten (anlegen, laden, umbenennen, löschen durch 3 s Halten)
 - **Regeln:** die Spielregeln der aktiven Welt
 - **System:** CPU-Temperatur und -Last, Arbeitsspeicher, Platte, SSD-Zustand, Laufzeiten, letzte Sicherung;
-  Minecraft neu starten oder stoppen, Rechner neu starten oder ausschalten (jeweils 3 s halten)
+  Minecraft neu starten oder stoppen, Rechner neu starten oder ausschalten (jeweils 3 s halten).
+  Unter **System → WLAN**: hinterlegte WLANs, das eigene WLAN (AP) mit Passwort und QR-Code, Offline-Modus
 
 Rechner neu starten und ausschalten darf Deep Mine Control (Benutzer `bsm`) über die polkit-Regel
 `/etc/polkit-1/rules.d/50-deep-mine-control.rules`, sonst nichts. Ausgeschaltet geht der Rechner nur am Gerät wieder an.
+
+## WLAN
+
+NetworkManager verwaltet **nur das WLAN** (`wlp3s0`, Atheros AR9287, 2,4 GHz); Ethernet bleibt bei
+systemd-networkd/netplan (`/etc/NetworkManager/conf.d/90-deep-mine.conf`, `/etc/systemd/network/10-wlan-unmanaged.network`).
+
+- Hinterlegte WLANs heißen in NetworkManager `dmc-wlan-N` (Priorität 10), das eigene WLAN `dmc-ap`
+  (Standard `MINECRAFT-World` / `deep-mine-craft`, Priorität −100). Ohne hinterlegtes WLAN in Reichweite geht
+  der AP an; hängt ein Kabel am Router, gibt er das Internet weiter (Server unter `10.42.0.1`).
+- Der Timer `deep-mine-wifi-check` nimmt den AP alle 5 Minuten kurz herunter, wenn niemand daran hängt, damit
+  der Server zurück ins hinterlegte WLAN findet.
+- Ohne Internet müssen sich Spieler normalerweise bei Xbox Live anmelden; der **Offline-Modus** schaltet
+  `online-mode` aus. Ob Konsolen ganz ohne Internet beitreten können, hängt vom Gerät ab.
 
 Die SMART-Werte der Systemplatte braucht root: Der Timer `deep-mine-smart` schreibt sie alle 30 Minuten
 nach `/var/lib/bsm/deep-mine-control/smart.json` (`install.sh` richtet ihn ein).

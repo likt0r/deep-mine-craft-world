@@ -19,6 +19,10 @@ export default defineNuxtConfig({
     /** Rechner neu starten und ausschalten. Darf `bsm` per polkit (install.sh). Tests setzen harmlose Befehle. */
     rebootCommand: "systemctl reboot",
     poweroffCommand: "systemctl poweroff",
+    /** WLAN über NetworkManager (install.sh). Tests setzen ein Fake-nmcli. */
+    nmcliPath: "nmcli",
+    iwPath: "iw",
+    wifiDevice: "wlp3s0",
     /** Länge einer Countdown-Sekunde beim Weltwechsel. Tests setzen 0. */
     countdownStepMs: 1000,
     /** So lange wartet das Auslesen der Spielregeln auf die Ausgabe von `gamerule`. */

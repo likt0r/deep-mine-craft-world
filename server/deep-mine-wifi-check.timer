@@ -1,0 +1,9 @@
+[Unit]
+Description=WLAN jede Minute prüfen (Deep Mine Control)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target

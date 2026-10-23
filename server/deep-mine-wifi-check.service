@@ -1,0 +1,8 @@
+[Unit]
+Description=WLAN: Rückfall aufs eigene WLAN und zurück (Deep Mine Control)
+After=NetworkManager.service
+Requires=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/deep-mine-wifi-check

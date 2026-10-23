@@ -21,7 +21,12 @@ export function useHoldToConfirm(ms: number, onConfirm: () => void) {
 
   /** Auf den Knopf binden: v-bind="handlers" */
   const handlers = {
-    onPointerdown: start,
+    // Der Knopf hält den Zeiger fest: Verschiebt sich das Layout darunter (z. B. weil Daten neu
+    // geladen werden), bricht das Halten nicht ab. Nur Loslassen bricht ab.
+    onPointerdown: (event: PointerEvent) => {
+      (event.currentTarget as Element | null)?.setPointerCapture?.(event.pointerId);
+      start();
+    },
     onPointerup: cancel,
     onPointerleave: cancel,
     onPointercancel: cancel,
