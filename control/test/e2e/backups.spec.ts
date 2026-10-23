@@ -98,3 +98,17 @@ test("Vor jedem Start sichern: Schalter; ohne Admin-Rechte gesperrt mit Hinweis"
   await expect(page.getByTestId("backups-auto-unknown")).toBeVisible();
   await expect(page.getByTestId("backups-auto-switch")).toBeDisabled();
 });
+
+test("Sichern, wenn eine Welt beendet wird: an, lässt sich ausschalten", async ({ page }) => {
+  await page.goto("/system/backups");
+  const worldEnd = page.getByTestId("backups-world-end-switch");
+  await expect(worldEnd).toHaveAttribute("aria-checked", "true");
+
+  await worldEnd.click();
+
+  await expect(toast(page, "Beim Beenden einer Welt wird nicht mehr gesichert.")).toBeVisible();
+  await expect(worldEnd).toHaveAttribute("aria-checked", "false");
+  expect(JSON.parse(readFileSync(join(ROOT, "deep-mine-control", "backup-settings.json"), "utf8"))).toEqual({
+    onWorldEnd: false
+  });
+});

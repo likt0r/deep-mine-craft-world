@@ -21,5 +21,7 @@ export interface BackupsInfo {
   dir: string;
   /** „Vor jedem Start sichern“ (BSM-Plugin backup_on_start). `null`: unbekannt, z. B. ohne Admin-Rechte. */
   autoBackup: boolean | null;
+  /** „Sichern, wenn eine Welt beendet wird“: Weltwechsel, Minecraft stoppen, Rechner herunterfahren oder neu starten */
+  onWorldEnd: boolean;
   worlds: WorldBackups[];
 }

@@ -41,6 +41,7 @@ describe("GET /api/backups", () => {
     expect(res.status).toBe(200);
     expect(res.body.dir).toBe(h.fixture.backupDir);
     expect(res.body.autoBackup).toBe(false);
+    expect(res.body.onWorldEnd).toBe(true);
     expect(res.body.worlds).toEqual([
       {
         place: 1,
@@ -215,5 +216,88 @@ describe("PUT /api/backups/auto", () => {
 
     expect(res.status).toBe(503);
     expect(res.body.message).toContain("Admin-Rechte");
+  });
+});
+
+describe("Sichern, wenn eine Welt beendet wird", () => {
+  /** Reihenfolge der BSM-Aufrufe, die hier zählen */
+  const order = () =>
+    h.fake.calls
+      .map((c) => c.path.split("/").slice(-2).join("/"))
+      .filter((p) => ["backup/action", "Bedrock/stop", "properties/set", "Bedrock/restart"].includes(p));
+  const setWorldEnd = (enabled: boolean) =>
+    h.request("/api/backups/on-world-end", { method: "PUT", body: { enabled } });
+
+  it("ist ohne Einstellung an und lässt sich ausschalten", async () => {
+    expect((await setWorldEnd(false)).status).toBe(200);
+    expect((await h.request("/api/backups")).body.onWorldEnd).toBe(false);
+    expect(JSON.parse(readFileSync(join(h.fixture.dataDir, "backup-settings.json"), "utf8"))).toEqual({
+      onWorldEnd: false
+    });
+  });
+
+  it("Weltwechsel: erst die bisherige Welt sichern, dann umstellen und neu starten", async () => {
+    await h.request("/api/places/2/load", { method: "POST" });
+    await settled();
+
+    expect(order()).toEqual(["backup/action", "properties/set", "Bedrock/restart"]);
+    expect(readdirSync(h.fixture.backupDir).some((f) => f.startsWith("Bedrock level_backup_"))).toBe(true);
+  });
+
+  it("Weltwechsel ausgeschaltet: kein Backup", async () => {
+    await setWorldEnd(false);
+
+    await h.request("/api/places/2/load", { method: "POST" });
+    await settled();
+
+    expect(order()).toEqual(["properties/set", "Bedrock/restart"]);
+  });
+
+  it("scheitert das Backup, findet der Wechsel trotzdem statt", async () => {
+    h.fake.state.tasksFail = true;
+
+    await h.request("/api/places/2/load", { method: "POST" });
+    await settled();
+
+    expect(h.fake.state.properties["level-name"]).toBe("w-bauwelt");
+  });
+
+  it("Minecraft stoppen: erst sichern, dann stoppen", async () => {
+    await h.request("/api/stop", { method: "POST" });
+
+    await expect.poll(() => h.fake.state.status).toBe("STOPPED");
+    expect(order()).toEqual(["backup/action", "Bedrock/stop"]);
+  });
+
+  it("Minecraft stoppen ausgeschaltet: nur stoppen", async () => {
+    await setWorldEnd(false);
+
+    await h.request("/api/stop", { method: "POST" });
+
+    await expect.poll(() => h.fake.state.status).toBe("STOPPED");
+    expect(order()).toEqual(["Bedrock/stop"]);
+  });
+
+  it("Herunterfahren: sichert und antwortet erst danach", async () => {
+    const res = await h.request("/api/backups/shutdown", { method: "POST" });
+
+    expect(res.body).toEqual({ backup: true });
+    expect(order()).toEqual(["backup/action"]);
+    expect(readdirSync(h.fixture.backupDir).some((f) => f.startsWith("Bedrock level_backup_"))).toBe(true);
+  });
+
+  it("Herunterfahren: aus, Minecraft aus oder Weltvorgang läuft → kein Backup", async () => {
+    await setWorldEnd(false);
+    expect((await h.request("/api/backups/shutdown", { method: "POST" })).body).toMatchObject({
+      backup: false
+    });
+
+    await setWorldEnd(true);
+    h.fake.state.status = "STOPPED";
+    expect((await h.request("/api/backups/shutdown", { method: "POST" })).body).toMatchObject({
+      backup: false
+    });
+
+    expect(order()).toEqual([]);
   });
 });

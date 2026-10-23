@@ -1,0 +1,17 @@
+[Unit]
+Description=Beim Herunterfahren die aktive Welt sichern (Deep Mine Control, System → Backups)
+# Nach BSM und Deep Mine Control gestartet, deshalb beim Herunterfahren vor ihnen gestoppt:
+# Minecraft läuft also noch, wenn hier gesichert wird.
+After=bsm.service deep-mine-control.service
+Wants=bsm.service deep-mine-control.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+# Sichert nur, wenn „Beim Herunterfahren sichern“ an ist und Minecraft läuft (Deep Mine Control entscheidet).
+ExecStop=/usr/bin/curl -fsS --max-time 170 -X POST http://127.0.0.1:3000/api/backups/shutdown
+TimeoutStopSec=180
+
+[Install]
+WantedBy=multi-user.target

@@ -73,6 +73,9 @@ install -m 755 "$HERE/server/ethernet.py" /usr/local/bin/deep-mine-ethernet
 install -m 644 "$HERE/server/deep-mine-ethernet.path" /etc/systemd/system/deep-mine-ethernet.path
 install -m 644 "$HERE/server/deep-mine-ethernet.service" /etc/systemd/system/deep-mine-ethernet.service
 
+# Beim Herunterfahren oder Neustarten die aktive Welt sichern
+install -m 644 "$HERE/server/deep-mine-backup-on-shutdown.service" /etc/systemd/system/deep-mine-backup-on-shutdown.service
+
 # SMART-Werte der Systemplatte für den Bereich System (smartctl braucht root)
 install -m 755 "$HERE/server/smart-status.sh" /usr/local/bin/deep-mine-smart-status
 install -m 644 "$HERE/server/deep-mine-smart.service" /etc/systemd/system/deep-mine-smart.service
@@ -104,6 +107,9 @@ systemctl enable deep-mine-control
 systemctl enable --now deep-mine-smart.timer
 systemctl enable --now deep-mine-wifi-check.timer
 systemctl enable --now deep-mine-ethernet.path
+systemctl enable deep-mine-backup-on-shutdown.service
+# Nur starten (ExecStart tut nichts), nicht neu starten: ein Stopp würde sonst schon jetzt sichern.
+systemctl start deep-mine-backup-on-shutdown.service
 systemctl start deep-mine-smart.service
 systemctl restart deep-mine-control
 systemctl restart caddy

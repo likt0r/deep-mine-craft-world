@@ -65,6 +65,12 @@ andere Welten entpackt Deep Mine Control das Backup selbst in deren Ordner, denn
 aktive Welt zurück**. Damit Deep Mine Control `backup_on_start` schalten darf, gibt `install.sh` dem BSM-Konto
 `deep-mine-control` die Rolle admin.
 
+**Sichern, wenn eine Welt beendet wird** (Standard an, `backup-settings.json`): Deep Mine Control sichert die
+bisherige Welt beim Weltwechsel (nach dem Countdown, vor dem Neustart) und vor „Minecraft stoppen“. Vor dem
+Herunterfahren oder Neustarten des Rechners sichert die Unit `deep-mine-backup-on-shutdown` (sie wird vor BSM
+gestoppt und ruft `POST /api/backups/shutdown` auf). Ein BSM-Plugin taugt dafür nicht: BSM legt beim Beenden
+seine Plugins still, bevor es die Server stoppt.
+
 ## Ethernet
 
 Deep Mine Control (`bsm`) darf netplan nicht ändern. Es schreibt nur eine Anfrage
