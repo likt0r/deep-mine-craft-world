@@ -49,10 +49,24 @@ Die Tablet-Oberfläche unter http://192.168.0.110 hat vier Bereiche (Handy: Tabs
 - **Regeln:** die Spielregeln der aktiven Welt
 - **System:** CPU-Temperatur und -Last, Arbeitsspeicher, Platte, SSD-Zustand, Laufzeiten, letzte Sicherung;
   Minecraft neu starten oder stoppen, Rechner neu starten oder ausschalten (jeweils 3 s halten).
-  Unter **System → WLAN**: hinterlegte WLANs, das eigene WLAN (AP) mit Passwort und QR-Code, Offline-Modus
+  Unter **System → Netzwerk**: Ethernet (DHCP oder feste IP), hinterlegte WLANs, das eigene WLAN (AP) mit Passwort
+  und QR-Code, Offline-Modus
 
 Rechner neu starten und ausschalten darf Deep Mine Control (Benutzer `bsm`) über die polkit-Regel
 `/etc/polkit-1/rules.d/50-deep-mine-control.rules`, sonst nichts. Ausgeschaltet geht der Rechner nur am Gerät wieder an.
+
+## Ethernet
+
+Deep Mine Control (`bsm`) darf netplan nicht ändern. Es schreibt nur eine Anfrage
+(`/var/lib/bsm/deep-mine-control/ethernet-request.json`); die Path-Unit `deep-mine-ethernet.path` startet den
+root-Helfer `/usr/local/bin/deep-mine-ethernet` (`server/ethernet.py`). Der prüft die Werte noch einmal, schreibt
+`/etc/netplan/60-deep-mine-ethernet.yaml` (feste IP; für DHCP wird die Datei gelöscht, dann gilt wieder
+`00-installer-config.yaml`), führt `netplan apply` aus und startet den Timer `deep-mine-ethernet-rollback`:
+**Ohne Bestätigung in der Oberfläche gilt nach 2 Minuten wieder die alte Einstellung.** Notfalls von Hand:
+`sudo rm /etc/netplan/60-deep-mine-ethernet.yaml && sudo netplan apply`.
+
+Caddy liefert Deep Mine Control unter jeder Adresse aus (`:80`), also auch im eigenen WLAN unter
+`http://10.42.0.1` und nach einem IP-Wechsel.
 
 ## WLAN
 

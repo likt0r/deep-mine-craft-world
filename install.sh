@@ -68,6 +68,11 @@ install -m 755 "$HERE/server/wifi-check.sh" /usr/local/bin/deep-mine-wifi-check
 install -m 644 "$HERE/server/deep-mine-wifi-check.service" /etc/systemd/system/deep-mine-wifi-check.service
 install -m 644 "$HERE/server/deep-mine-wifi-check.timer" /etc/systemd/system/deep-mine-wifi-check.timer
 
+# Ethernet-Einstellungen aus Deep Mine Control (System → Netzwerk): root-Helfer, ausgelöst über eine Path-Unit
+install -m 755 "$HERE/server/ethernet.py" /usr/local/bin/deep-mine-ethernet
+install -m 644 "$HERE/server/deep-mine-ethernet.path" /etc/systemd/system/deep-mine-ethernet.path
+install -m 644 "$HERE/server/deep-mine-ethernet.service" /etc/systemd/system/deep-mine-ethernet.service
+
 # SMART-Werte der Systemplatte für den Bereich System (smartctl braucht root)
 install -m 755 "$HERE/server/smart-status.sh" /usr/local/bin/deep-mine-smart-status
 install -m 644 "$HERE/server/deep-mine-smart.service" /etc/systemd/system/deep-mine-smart.service
@@ -81,6 +86,7 @@ systemctl enable --now bsm
 systemctl enable deep-mine-control
 systemctl enable --now deep-mine-smart.timer
 systemctl enable --now deep-mine-wifi-check.timer
+systemctl enable --now deep-mine-ethernet.path
 systemctl start deep-mine-smart.service
 systemctl restart deep-mine-control
 systemctl restart caddy

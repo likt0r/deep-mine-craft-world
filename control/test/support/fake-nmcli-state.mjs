@@ -18,6 +18,15 @@ export function initialState() {
     radio: true,
     /** Kabel steckt: Standardroute über enp1s0 (für das Fake-ip) */
     wired: true,
+    /** Ethernet enp1s0 wie auf dem echten Server (für Fake-ip und Fake-resolvectl) */
+    ethernet: {
+      address: "192.168.0.110",
+      prefix: 24,
+      gateway: "192.168.0.1",
+      dns: ["192.168.0.5"],
+      dynamic: true,
+      mac: "40:62:31:00:42:8c"
+    },
     /** NetworkManager läuft nicht: jeder Aufruf scheitert. */
     broken: false
   };

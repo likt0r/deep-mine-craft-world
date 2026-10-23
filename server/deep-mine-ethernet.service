@@ -1,0 +1,6 @@
+[Unit]
+Description=Ethernet-Einstellung anwenden oder bestätigen (Deep Mine Control)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/deep-mine-ethernet run
