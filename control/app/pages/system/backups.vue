@@ -22,6 +22,24 @@ async function backupNow() {
   }
 }
 
+const switchingWorldEnd = ref(false);
+async function setWorldEnd(enabled: boolean) {
+  switchingWorldEnd.value = true;
+  try {
+    await $fetch("/api/backups/on-world-end", { method: "PUT", body: { enabled } });
+    feedback.done(
+      enabled
+        ? "Beim Beenden einer Welt wird gesichert."
+        : "Beim Beenden einer Welt wird nicht mehr gesichert."
+    );
+    await refresh();
+  } catch {
+    feedback.failed();
+  } finally {
+    switchingWorldEnd.value = false;
+  }
+}
+
 const switchingAuto = ref(false);
 async function setAuto(enabled: boolean) {
   switchingAuto.value = true;
@@ -87,6 +105,23 @@ const downloadUrl = (file: string) => `/api/backups/download/${encodeURIComponen
 
     <SystemCard title="Automatisch sichern" icon="i-lucide-clock" data-testid="backups-auto">
       <div class="flex items-center gap-3">
+        <span id="world-end-label" class="flex-1 font-semibold">Sichern, wenn eine Welt beendet wird</span>
+        <USwitch
+          size="xl"
+          aria-labelledby="world-end-label"
+          :modelValue="info?.onWorldEnd ?? true"
+          :loading="switchingWorldEnd"
+          :disabled="switchingWorldEnd || !info"
+          data-testid="backups-world-end-switch"
+          @update:modelValue="setWorldEnd"
+        />
+      </div>
+      <p class="text-sm text-muted">
+        Beim Wechsel zu einer anderen Welt, beim Stoppen von Minecraft und bevor der Rechner herunterfährt
+        oder neu startet – auch über den Einschaltknopf. Gesichert wird die Welt, die gerade endet. Bei einem
+        Stromausfall geht das natürlich nicht.
+      </p>
+      <div class="flex items-center gap-3 border-t border-default pt-3">
         <span id="auto-label" class="flex-1 font-semibold">Vor jedem Start sichern</span>
         <USwitch
           size="xl"

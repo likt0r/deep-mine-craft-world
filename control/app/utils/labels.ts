@@ -32,6 +32,7 @@ export function difficultyLabel(difficulty: string): string {
 
 const SWITCH_PHASES: Record<WorldSwitch["phase"], string> = {
   countdown: "Countdown im Spiel",
+  backup: "Alte Welt wird gesichert",
   restart: "Server startet neu"
 };
 

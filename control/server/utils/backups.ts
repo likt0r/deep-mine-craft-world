@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readdir, rename, rm, stat } from "node:fs/promises";
+import { readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 
@@ -66,15 +66,49 @@ export async function readBackups(places: Place[]): Promise<WorldBackups[]> {
   return worlds;
 }
 
+/**
+ * Einstellungen von Deep Mine Control zu Backups. `onWorldEnd`: sichern, wenn eine Welt beendet wird
+ * (Weltwechsel, Minecraft stoppen, Rechner herunterfahren oder neu starten). Ohne Datei an.
+ */
+export interface BackupSettings {
+  onWorldEnd: boolean;
+}
+
+function settingsFile() {
+  return join(useRuntimeConfig().dataDir, "backup-settings.json");
+}
+
+export async function readBackupSettings(): Promise<BackupSettings> {
+  try {
+    const stored = JSON.parse(await readFile(settingsFile(), "utf8"));
+    return { onWorldEnd: stored.onWorldEnd !== false };
+  } catch {
+    return { onWorldEnd: true };
+  }
+}
+
+export async function writeBackupSettings(settings: BackupSettings): Promise<void> {
+  await writeFile(settingsFile(), JSON.stringify(settings) + "\n");
+}
+
+/** Sichert die aktive Welt über BSM und wartet, bis das Backup fertig ist. BSM kann nur die aktive Welt sichern. */
+export async function backupActiveWorld(): Promise<void> {
+  const { task_id } = await bsm.backupWorld();
+  await waitForTask(task_id);
+}
+
 /** Wartet, bis eine BSM-Aufgabe fertig ist. Wirft, wenn sie scheitert. */
 export async function waitForTask(taskId: string, timeoutMs = 300_000): Promise<void> {
   const until = Date.now() + timeoutMs;
+  // Erst schnell nachfragen, dann seltener: kurze Aufgaben sind so gleich fertig, lange belasten BSM nicht.
+  let wait = 50;
   while (Date.now() < until) {
     const task = await bsm.taskStatus(taskId);
     if (task.status === "completed") return;
     if (task.status === "failed" || task.status === "cancelled")
       throw new Error(`BSM-Aufgabe ${task.status}: ${task.error?.message ?? task.message}`);
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, wait));
+    wait = Math.min(wait * 2, 500);
   }
   throw new Error("BSM-Aufgabe dauert zu lange");
 }

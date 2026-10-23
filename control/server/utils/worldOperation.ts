@@ -52,8 +52,8 @@ const COUNTDOWN = [10, 5, 3, 2, 1];
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Wechselt die aktive Welt: Spielt jemand, erst 10 s Countdown im Chat; sonst gleich.
- * Dann Properties setzen und neu starten. BSM antwortet auf den Neustart erst, wenn der Server wieder läuft.
+ * Wechselt die aktive Welt: Spielt jemand, erst 10 s Countdown im Chat; sonst gleich. Dann die bisherige
+ * Welt sichern (wenn eingestellt), Properties setzen und neu starten. BSM antwortet auf den Neustart erst, wenn der Server wieder läuft.
  */
 export async function switchWorld(worldName: string, properties: Record<string, string>): Promise<void> {
   const { players } = await bsm.summary();
@@ -63,6 +63,14 @@ export async function switchWorld(worldName: string, properties: Record<string, 
       await bsm.sendCommand(`say Gleich geht es nach „${worldName}“! Neustart in ${seconds} s.`);
       await sleep((seconds - (COUNTDOWN[i + 1] ?? 0)) * step);
     }
+  }
+  // Die bisherige Welt sichern, mit dem letzten Stand direkt vor dem Neustart.
+  if ((await readBackupSettings()).onWorldEnd) {
+    if (switching) switching.phase = "backup";
+    // Ein gescheitertes Backup darf den Wechsel nicht aufhalten.
+    await backupActiveWorld().catch((error) =>
+      console.error("Backup vor dem Weltwechsel fehlgeschlagen:", error)
+    );
   }
   if (switching) switching.phase = "restart";
   await bsm.setProperties(properties);

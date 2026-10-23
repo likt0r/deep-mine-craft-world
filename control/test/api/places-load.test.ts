@@ -93,7 +93,7 @@ describe("POST /api/places/{n}/load", () => {
     const status = (await h.request("/api/status")).body;
     expect(status.busy).toBe(true);
     expect(status.switching).toMatchObject({ place: 2, world: "Bauwelt" });
-    expect(["countdown", "restart"]).toContain(status.switching.phase);
+    expect(["countdown", "backup", "restart"]).toContain(status.switching.phase);
     expect((await h.request("/api/places/1/load", { method: "POST" })).status).toBe(409);
     expect((await h.request("/api/places/2", { method: "DELETE" })).status).toBe(409);
     await expect.poll(notBusy).toBe(false);

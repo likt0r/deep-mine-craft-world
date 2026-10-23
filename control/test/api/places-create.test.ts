@@ -87,7 +87,7 @@ describe("POST /api/places/{n}", () => {
     expect(busy.body.busy).toBe(true);
     // Die Seite soll zeigen, welcher Platz gerade kommt.
     expect(busy.body.switching).toMatchObject({ place: 2, world: normal.name });
-    expect(["countdown", "restart"]).toContain(busy.body.switching.phase);
+    expect(["countdown", "backup", "restart"]).toContain(busy.body.switching.phase);
 
     await settled();
     expect((await h.request("/api/status")).body.switching).toBeNull();

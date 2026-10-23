@@ -13,10 +13,11 @@ export interface Status {
   switching: WorldSwitch | null;
 }
 
-/** Ein Weltwechsel: erst 10 s Countdown im Chat, dann startet der Server neu. */
+/** Ein Weltwechsel: erst 10 s Countdown im Chat (wenn jemand spielt), dann sichern (wenn eingestellt), dann Neustart. */
 export interface WorldSwitch {
   place: number;
   /** Anzeigename der Welt, die kommt */
   world: string;
-  phase: "countdown" | "restart";
+  /** countdown: Countdown im Chat; backup: die bisherige Welt wird gesichert; restart: Server startet neu */
+  phase: "countdown" | "backup" | "restart";
 }
