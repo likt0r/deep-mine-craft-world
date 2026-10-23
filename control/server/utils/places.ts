@@ -107,3 +107,8 @@ export async function updateActiveWorld(update: Partial<Pick<WorldInfo, "mode" |
   };
   writeStored(stored);
 }
+
+/** Eindeutiger Ordnername mit Zeitstempel, damit er nie wiederverwendet wird. */
+export function newWorldFolder(): string {
+  return `world-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}

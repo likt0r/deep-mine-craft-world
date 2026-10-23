@@ -58,6 +58,10 @@ iw reg set DE || true
 systemctl enable --now NetworkManager
 # Läuft NetworkManager schon, die Konfiguration oben neu einlesen (z. B. WireGuard dazugekommen).
 nmcli general reload conf || true
+# Ein schon hochgeladenes VPN (Deep Mine Control) darf dem Kabel nie die Route ins Heimnetz nehmen.
+if nmcli -t -f NAME connection show | grep -qx dmc-vpn; then
+  nmcli connection modify dmc-vpn ipv4.route-metric 1000 ipv6.route-metric 1000
+fi
 if ! nmcli -t -f NAME connection show | grep -qx dmc-ap; then
   nmcli connection add type wifi ifname wlp3s0 con-name dmc-ap ssid MINECRAFT-World \
     802-11-wireless.mode ap 802-11-wireless.band bg ipv4.method shared \

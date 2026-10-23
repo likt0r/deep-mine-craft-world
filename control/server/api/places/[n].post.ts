@@ -9,11 +9,6 @@ const createRequest = z.object({
   mode: z.enum(["creative", "survival", "adventure"])
 });
 
-/** Eindeutiger Ordnername mit Zeitstempel, damit er nie wiederverwendet wird. */
-function newWorldFolder(): string {
-  return `world-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
 export default defineEventHandler(async (event) => {
   const place = getRouterParam(event, "n") ?? "";
   if (!/^[1-9]$|^10$/.test(place)) throw createError({ statusCode: 400, message: "Ungültiger Platz" });

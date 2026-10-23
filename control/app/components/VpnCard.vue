@@ -20,7 +20,12 @@ async function upload(event: Event) {
   try {
     await $fetch("/api/network/vpn", {
       method: "PUT",
-      body: { config: await file.text(), autoconnect: vpn.value?.configured ? vpn.value.autoconnect : true }
+      body: {
+        config: await file.text(),
+        autoconnect: vpn.value?.configured ? vpn.value.autoconnect : true,
+        // Standard: nur das Netz hinter dem VPN, nicht das Internet.
+        routeAll: vpn.value?.configured ? vpn.value.routeAll : false
+      }
     });
     feedback.done("VPN eingerichtet, verbinde …");
     changed();
@@ -38,6 +43,18 @@ async function connect(active: boolean) {
   try {
     await $fetch("/api/network/vpn/connect", { method: "POST", body: { active } });
     feedback.done(active ? "VPN verbindet …" : "VPN getrennt.");
+    changed();
+  } catch {
+    feedback.failed();
+  }
+}
+
+async function setRouteAll(enabled: boolean) {
+  try {
+    await $fetch("/api/network/vpn/route-all", { method: "PUT", body: { enabled } });
+    feedback.done(
+      enabled ? "Internetverkehr läuft jetzt durchs VPN." : "Internetverkehr geht wieder direkt."
+    );
     changed();
   } catch {
     feedback.failed();
@@ -107,8 +124,26 @@ async function remove() {
         <dt class="text-muted">DNS</dt>
         <dd class="font-mono">{{ vpn.dns.join(", ") || "–" }}</dd>
       </dl>
+      <div v-if="vpn.allowsAll" class="flex flex-col gap-1.5" data-testid="vpn-route-all">
+        <div class="flex items-center gap-3">
+          <span id="vpn-route-all-label" class="flex-1 font-semibold"
+            >Gesamten Internetverkehr durchs VPN</span
+          >
+          <USwitch
+            size="xl"
+            aria-labelledby="vpn-route-all-label"
+            :modelValue="vpn.routeAll"
+            data-testid="vpn-route-all-switch"
+            @update:modelValue="setRouteAll"
+          />
+        </div>
+        <p class="text-sm text-muted">
+          Aus (empfohlen): Nur das Netz hinter dem VPN, z. B. dein Heimnetz, läuft durchs VPN. So erreichst du
+          den Server von dort unter seiner VPN-Adresse, das Internet geht weiter direkt.
+        </p>
+      </div>
       <UAlert
-        v-if="vpn.fullTunnel"
+        v-if="vpn.routeAll"
         color="warning"
         variant="subtle"
         icon="i-lucide-triangle-alert"

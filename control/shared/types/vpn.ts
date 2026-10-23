@@ -11,6 +11,11 @@ export interface VpnInfo {
   /** Gegenstelle(n), z. B. vpn.example.org:51820 */
   endpoints: string[];
   dns: string[];
-  /** Aller Verkehr läuft durchs VPN (AllowedIPs 0.0.0.0/0 oder ::/0) */
-  fullTunnel: boolean;
+  /** Die Konfiguration erlaubt allen Verkehr durchs VPN (AllowedIPs 0.0.0.0/0 oder ::/0) */
+  allowsAll: boolean;
+  /**
+   * Der gesamte Internetverkehr läuft tatsächlich durchs VPN. Standard aus: dann geht nur das Netz hinter dem
+   * VPN (z. B. das Heimnetz) durch, das Internet direkt.
+   */
+  routeAll: boolean;
 }

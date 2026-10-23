@@ -1,10 +1,6 @@
-import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
-import { promisify } from "node:util";
-
-const run = promisify(execFile);
 
 /** Wie BSM den Anfang eines Backup-Namens bildet: Weltordner, Sonderzeichen durch „_“ ersetzt. */
 export function backupPrefix(folder: string): string {
@@ -119,7 +115,7 @@ export async function waitForTask(taskId: string, timeoutMs = 300_000): Promise<
  * bleibt die Welt wie sie war.
  */
 export async function restoreInactiveWorld(backup: string, folder: string): Promise<void> {
-  const { bsmServerDir, pythonPath } = useRuntimeConfig();
+  const { bsmServerDir } = useRuntimeConfig();
   const worldsDir = resolve(bsmServerDir, "worlds");
   const target = resolve(worldsDir, folder);
   if (!target.startsWith(worldsDir + sep)) throw new Error("Ungültiger Weltordner");
@@ -128,11 +124,9 @@ export async function restoreInactiveWorld(backup: string, folder: string): Prom
   const unpacked = join(worldsDir, `.restore-${stamp}`);
   const old = join(worldsDir, `.old-${stamp}`);
   try {
-    // Pythons zipfile entfernt absolute Pfade und „..“ beim Entpacken.
-    await run(pythonPath, ["-m", "zipfile", "-e", backup, unpacked], { timeout: 120_000 });
-    if (!existsSync(join(unpacked, "level.dat"))) throw new Error("Im Backup fehlt level.dat");
+    const world = await extractMcworld(backup, unpacked);
     if (existsSync(target)) await rename(target, old);
-    await rename(unpacked, target);
+    await rename(world, target);
   } finally {
     await rm(unpacked, { recursive: true, force: true });
     await rm(old, { recursive: true, force: true });

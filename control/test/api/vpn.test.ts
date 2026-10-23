@@ -40,7 +40,8 @@ describe("VPN", () => {
       address: ["10.8.0.2/24"],
       endpoints: ["vpn.example.org:51820"],
       dns: ["10.8.0.1"],
-      fullTunnel: false
+      allowsAll: false,
+      routeAll: false
     });
     expect(JSON.stringify(info.body)).not.toContain(PRIVATE_KEY);
   });
@@ -52,10 +53,34 @@ describe("VPN", () => {
     expect(readFileSync(`${h.fixture.dataDir}/vpn.json`, "utf8")).not.toContain(PRIVATE_KEY);
   });
 
-  it("Voll-Tunnel wird erkannt", async () => {
+  it("VPN-Routen haben weniger Vorrang als das Kabel", async () => {
+    await upload(wireguardConfig());
+
+    expect(vpnProfile()).toMatchObject({ metric4: "1000", metric6: "1000" });
+  });
+
+  it("erlaubt die Konfiguration allen Verkehr, geht das Internet trotzdem standardmäßig direkt", async () => {
     await upload(wireguardConfig("0.0.0.0/0, ::/0"));
 
-    expect((await h.request("/api/network/vpn")).body.fullTunnel).toBe(true);
+    expect(vpnProfile()).toMatchObject({ neverDefault4: "yes", neverDefault6: "yes" });
+    expect((await h.request("/api/network/vpn")).body).toMatchObject({ allowsAll: true, routeAll: false });
+  });
+
+  it("Internetverkehr durchs VPN lässt sich einschalten; die Verbindung wird neu aufgebaut", async () => {
+    await upload(wireguardConfig("0.0.0.0/0"));
+    await expect.poll(() => vpnProfile().up).toBe(true);
+    const ups = () =>
+      readFileSync(`${h.fixture.nmcliState}.calls`, "utf8")
+        .split("\n")
+        .filter((l) => l === JSON.stringify(["connection", "up", "dmc-vpn"])).length;
+    const before = ups();
+
+    const res = await h.request("/api/network/vpn/route-all", { method: "PUT", body: { enabled: true } });
+
+    expect(res.status).toBe(200);
+    expect(vpnProfile()).toMatchObject({ neverDefault4: "no", neverDefault6: "no" });
+    expect((await h.request("/api/network/vpn")).body.routeAll).toBe(true);
+    await expect.poll(ups).toBe(before + 1);
   });
 
   it("ein neuer Upload ersetzt die alte Konfiguration", async () => {
@@ -63,10 +88,7 @@ describe("VPN", () => {
     await upload(wireguardConfig("0.0.0.0/0"), false);
 
     expect(nm().connections.filter((c: { name: string }) => c.name === "dmc-vpn")).toHaveLength(1);
-    expect((await h.request("/api/network/vpn")).body).toMatchObject({
-      autoconnect: false,
-      fullTunnel: true
-    });
+    expect((await h.request("/api/network/vpn")).body).toMatchObject({ autoconnect: false, allowsAll: true });
   });
 
   it.each([

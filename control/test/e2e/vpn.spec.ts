@@ -51,12 +51,28 @@ test("Konfiguration hochladen, Angaben sehen, trennen und entfernen", async ({ p
   await expect(page.getByTestId("vpn-empty")).toBeVisible();
 });
 
-test("Voll-Tunnel zeigt eine Warnung", async ({ page }) => {
+test("Internetverkehr durchs VPN: standardmäßig aus, eingeschaltet mit Warnung", async ({ page }) => {
   await page.goto("/system/netzwerk");
 
   await uploadConfig(page, wireguardConfig("0.0.0.0/0"));
 
+  const routeAll = page.getByTestId("vpn-route-all-switch");
+  await expect(routeAll).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByTestId("vpn-full-tunnel")).toHaveCount(0);
+
+  await routeAll.click();
+
+  await expect(routeAll).toHaveAttribute("aria-checked", "true");
   await expect(page.getByTestId("vpn-full-tunnel")).toContainText("Aller Verkehr läuft durchs VPN");
+});
+
+test("bei einer Konfiguration nur fürs Heimnetz gibt es den Schalter nicht", async ({ page }) => {
+  await page.goto("/system/netzwerk");
+
+  await uploadConfig(page, wireguardConfig("192.168.0.0/24"));
+
+  await expect(page.getByTestId("vpn-details")).toBeVisible();
+  await expect(page.getByTestId("vpn-route-all")).toHaveCount(0);
 });
 
 test("eine kaputte Datei wird mit Grund abgelehnt", async ({ page }) => {
