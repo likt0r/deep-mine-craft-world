@@ -45,24 +45,95 @@ test("Gamertag auf die Whitelist setzen und wieder entfernen", async ({ page }) 
   const row = page.getByTestId("players-whitelist").getByTestId("player-row");
   await expect(row).toHaveAttribute("data-player", "Steve");
 
-  await row.getByTestId("whitelist-remove").click();
+  await row.click();
+  await page.getByTestId("player-whitelist").click();
   await expect(toast(page, "Steve steht nicht mehr auf der Whitelist.")).toBeVisible();
+  // Steve war nie da: ohne Whitelist steht er nirgends mehr, das Sheet geht zu.
+  await expect(page.getByTestId("player-sheet")).toBeHidden();
   await expect(row).toHaveCount(0);
   expect((await fake.get()).allowlist).toEqual([]);
 });
 
-test("wer schon mal da war, kommt mit einem Tipp auf die Whitelist", async ({ page }) => {
+test("im Spieler-Sheet die Whitelist an- und ausschalten", async ({ page }) => {
   await fake.set({ knownPlayers: [{ name: "Tom", xuid: "2000" }] });
   await page.goto("/spieler");
 
   await page.getByText("Schon mal da gewesen (1)").click();
-  await page.getByTestId("whitelist-add-known").click();
+  await page.getByTestId("players-seen").getByTestId("player-row").click();
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.getByRole("heading", { name: "Tom" })).toBeVisible();
+  await expect(sheet.getByTestId("player-sheet-online")).toHaveText("Nicht online");
+  const whitelist = sheet.getByTestId("player-whitelist");
+  await expect(whitelist).not.toBeChecked();
 
+  await whitelist.click();
+  await expect(toast(page, "Tom steht jetzt auf der Whitelist.")).toBeVisible();
+  await expect(whitelist).toBeChecked();
   await expect(page.getByTestId("players-whitelist").getByTestId("player-row")).toHaveAttribute(
     "data-player",
     "Tom"
   );
   await expect(page.getByTestId("players-seen")).toHaveCount(0);
+
+  await whitelist.click();
+  await expect(toast(page, "Tom steht nicht mehr auf der Whitelist.")).toBeVisible();
+  await expect(whitelist).not.toBeChecked();
+  expect((await fake.get()).allowlist).toEqual([]);
+});
+
+test("Offline-Spieler kann man nicht kicken", async ({ page }) => {
+  await fake.set({ allowlist: [whitelistEntry("Ben")] });
+  await page.goto("/spieler");
+
+  await page.getByTestId("players-whitelist").getByTestId("player-row").click();
+
+  await expect(page.getByTestId("player-sheet")).toBeVisible();
+  await expect(page.getByTestId("player-whitelist")).toBeChecked();
+  await expect(page.getByTestId("player-kick")).toHaveCount(0);
+});
+
+test("einen Online-Spieler mit Nachricht kicken", async ({ page }) => {
+  await fake.set({ players: ["Lena", "Tom"] });
+  await page.goto("/spieler");
+
+  await page.locator('[data-testid="player-row"][data-player="Lena"]').click();
+  await expect(page.getByRole("dialog").getByTestId("player-sheet-online")).toHaveText("Online");
+  await page.getByTestId("player-kick").click();
+
+  const reason = page.getByTestId("player-kick-reason");
+  const confirm = page.getByTestId("player-kick-confirm");
+  await reason.fill('Sag "Tschüss"');
+  await expect(confirm).toBeDisabled();
+  await reason.fill("Zeit fürs Abendessen!");
+  await confirm.click();
+
+  await expect(toast(page, "Lena wurde gekickt.")).toBeVisible();
+  await expect(page.getByTestId("player-sheet")).toBeHidden();
+  expect((await fake.commands()).filter((c) => c.startsWith("kick "))).toEqual([
+    'kick "Lena" Zeit fürs Abendessen!'
+  ]);
+  // Lena ist nicht mehr online, aber schon mal da gewesen.
+  await expect(page.getByTestId("players-online").getByTestId("player-row")).toHaveAttribute(
+    "data-player",
+    "Tom"
+  );
+});
+
+test("Antippen eines Spielers auf Spielen öffnet sein Spieler-Sheet", async ({ page }) => {
+  await fake.set({ players: ["Lena", "Tom"] });
+  await page.goto("/");
+
+  await page.locator('[data-testid="player-option"][data-player="Tom"]').getByTestId("player-open").click();
+
+  await expect(page).toHaveURL(/\/spieler\?spieler=Tom$/);
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.getByRole("heading", { name: "Tom" })).toBeVisible();
+  await expect(sheet.getByTestId("player-kick")).toBeVisible();
+
+  // Schließen nimmt den Spieler aus der Adresse, damit Neuladen das Sheet nicht wieder öffnet.
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("player-sheet")).toBeHidden();
+  await expect(page).toHaveURL(/\/spieler$/);
 });
 
 test("ab 11 Spielern gibt es eine Suche, sie öffnet auch die früheren Spieler", async ({ page }) => {

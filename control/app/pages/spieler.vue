@@ -1,7 +1,6 @@
 <script setup lang="ts">
 useSeoMeta({ title: "Spieler · Deep Mine Control" });
 
-const feedback = useFeedback();
 const { data, refresh } = useFetch<PlayersInfo>("/api/players", { key: "players" });
 useWhileVisible(refresh, 5000, { immediate: false });
 
@@ -17,6 +16,7 @@ const online = computed(() => players.value.filter((p) => p.online));
 const whitelisted = computed(() => players.value.filter((p) => !p.online && p.whitelisted));
 const seen = computed(() => players.value.filter((p) => !p.online && !p.whitelisted));
 
+const feedback = useFeedback();
 const closed = computed(() => data.value?.closed ?? false);
 const newPlayers = computed(() => data.value?.newPlayers ?? "member");
 const unlistedOnline = computed(() => (data.value?.players ?? []).filter((p) => p.online && !p.whitelisted));
@@ -73,30 +73,40 @@ function chooseNewPlayers(value: "visitor" | "member") {
   void setAccess({ newPlayers: value });
 }
 
-const GAMERTAG = /^[A-Za-z0-9 ]{1,16}(#\d{1,4})?$/;
 const newName = ref("");
-const busy = ref<string | null>(null);
-
-async function setWhitelisted(name: string, on: boolean) {
-  busy.value = name;
-  try {
-    await $fetch("/api/players/whitelist", { method: on ? "POST" : "DELETE", body: { name } });
-    feedback.done(
-      on ? `${name} steht jetzt auf der Whitelist.` : `${name} steht nicht mehr auf der Whitelist.`
-    );
-    await refresh();
-    return true;
-  } catch {
-    feedback.failed();
-    return false;
-  } finally {
-    busy.value = null;
-  }
-}
+const adding = ref(false);
+const setWhitelisted = useWhitelist();
 
 async function add() {
+  adding.value = true;
   if (await setWhitelisted(newName.value.trim(), true)) newName.value = "";
+  adding.value = false;
 }
+
+/** Spieler, dessen Sheet offen ist. `?spieler=<Name>` öffnet es gleich (aus der Online-Liste auf Spielen). */
+const route = useRoute();
+const router = useRouter();
+const selected = ref<string | null>(null);
+const selectedPlayer = computed(() => {
+  const key = selected.value?.toLowerCase();
+  return data.value?.players.find((p) => p.name.toLowerCase() === key) ?? null;
+});
+
+// Erst im Browser öffnen: Das Sheet braucht das Fenster.
+onMounted(() => {
+  if (typeof route.query.spieler === "string") selected.value = route.query.spieler;
+});
+
+function closeSheet() {
+  selected.value = null;
+  // Sonst geht das Sheet beim Neuladen wieder auf.
+  if (route.query.spieler !== undefined) void router.replace({ query: {} });
+}
+
+// Steht der Spieler nicht (mehr) in der Liste, z. B. nach dem Entfernen von der Whitelist, geht das Sheet zu.
+watch([data, selected], () => {
+  if (data.value && selected.value && !selectedPlayer.value) closeSheet();
+});
 </script>
 
 <template>
@@ -190,8 +200,8 @@ async function add() {
           icon="i-lucide-plus"
           size="lg"
           class="block-btn"
-          :loading="busy === newName.trim()"
-          :disabled="!GAMERTAG.test(newName.trim()) || busy !== null"
+          :loading="adding"
+          :disabled="!GAMERTAG.test(newName.trim()) || adding"
           data-testid="whitelist-submit"
         >
           Hinzufügen
@@ -213,7 +223,12 @@ async function add() {
       <h2 class="font-pixel text-xl font-semibold text-highlighted">Online</h2>
       <p v-if="online.length === 0" class="text-muted">Niemand ist gerade online.</p>
       <ul v-else class="flex flex-col gap-2">
-        <PlayerRow v-for="player in online" :key="player.name" :player="player" />
+        <PlayerRow
+          v-for="player in online"
+          :key="player.name"
+          :player="player"
+          @open="selected = player.name"
+        />
       </ul>
     </section>
 
@@ -221,22 +236,12 @@ async function add() {
       <h2 class="font-pixel text-xl font-semibold text-highlighted">Whitelist</h2>
       <p v-if="whitelisted.length === 0" class="text-muted">Sonst steht niemand auf der Whitelist.</p>
       <ul v-else class="flex flex-col gap-2">
-        <PlayerRow v-for="player in whitelisted" :key="player.name" :player="player">
-          <UButton
-            icon="i-lucide-user-minus"
-            color="neutral"
-            variant="subtle"
-            size="lg"
-            class="block-btn"
-            :aria-label="`${player.name} von der Whitelist nehmen`"
-            :loading="busy === player.name"
-            :disabled="busy !== null"
-            data-testid="whitelist-remove"
-            @click="setWhitelisted(player.name, false)"
-          >
-            Entfernen
-          </UButton>
-        </PlayerRow>
+        <PlayerRow
+          v-for="player in whitelisted"
+          :key="player.name"
+          :player="player"
+          @open="selected = player.name"
+        />
       </ul>
     </section>
 
@@ -252,24 +257,16 @@ async function add() {
         Schon mal da gewesen ({{ seen.length }})
       </summary>
       <ul class="mt-2.5 flex flex-col gap-2">
-        <PlayerRow v-for="player in seen" :key="player.name" :player="player">
-          <UButton
-            icon="i-lucide-user-plus"
-            color="neutral"
-            variant="subtle"
-            size="lg"
-            class="block-btn"
-            :aria-label="`${player.name} auf die Whitelist setzen`"
-            :loading="busy === player.name"
-            :disabled="busy !== null"
-            data-testid="whitelist-add-known"
-            @click="setWhitelisted(player.name, true)"
-          >
-            Whitelist
-          </UButton>
-        </PlayerRow>
+        <PlayerRow
+          v-for="player in seen"
+          :key="player.name"
+          :player="player"
+          @open="selected = player.name"
+        />
       </ul>
     </details>
+
+    <PlayerSheet :player="selectedPlayer" @close="closeSheet" />
 
     <UDrawer
       v-model:open="askClose"

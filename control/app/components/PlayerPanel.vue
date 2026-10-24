@@ -35,8 +35,16 @@ async function teleport(player: string) {
         data-testid="player-option"
         :data-player="player"
       >
-        <PlayerAvatar :name="player" />
-        <span class="min-w-0 flex-1 truncate font-semibold">{{ player }}</span>
+        <!-- Führt zum Spieler-Sheet im Bereich Spieler. -->
+        <NuxtLink
+          :to="{ path: '/spieler', query: { spieler: player } }"
+          class="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg"
+          data-testid="player-open"
+        >
+          <PlayerAvatar :name="player" />
+          <span class="min-w-0 truncate font-semibold">{{ player }}</span>
+          <UIcon name="i-lucide-chevron-right" class="size-5 shrink-0 text-dimmed" />
+        </NuxtLink>
         <UButton
           data-testid="teleport-to"
           icon="i-lucide-users-round"

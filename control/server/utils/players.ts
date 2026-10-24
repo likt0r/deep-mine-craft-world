@@ -1,13 +1,13 @@
 import { z } from "zod";
 
-/**
- * Gamertag wie bei Xbox: Buchstaben, Ziffern, Leerzeichen, optional `#1234`. Er kommt in Anführungszeichen in
- * Konsolenbefehle, deshalb sind keine erlaubt.
- */
-export const gamertag = z
+/** Gamertag eines Spielers (siehe `GAMERTAG`). */
+export const gamertag = z.string().trim().regex(GAMERTAG);
+
+/** Nachricht beim Kicken oder Grund beim Sperren. Leer heißt: keine. */
+export const playerMessage = z
   .string()
-  .trim()
-  .regex(/^[A-Za-z0-9 ]{1,16}(#\d{1,4})?$/);
+  .refine(isValidPlayerMessage)
+  .transform((text) => text.trim());
 
 /** Online-Spieler, bekannte Spieler und Whitelist als eine Liste. Gleiche Gamertags in anderer Schreibweise sind ein Spieler. */
 export async function readPlayers(): Promise<PlayersInfo> {

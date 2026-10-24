@@ -208,3 +208,78 @@ describe("DELETE /api/players/whitelist", () => {
     expect(h.fake.commands()).toEqual(["allowlist reload"]);
   });
 });
+
+describe("POST /api/players/kick", () => {
+  it("kickt einen Online-Spieler mit Nachricht, in der Schreibweise aus dem Spiel", async () => {
+    h.fake.state.players = ["Lena", "Tom"];
+
+    const res = await h.request("/api/players/kick", {
+      method: "POST",
+      body: { name: "lena", reason: " Zeit fürs Abendessen! " }
+    });
+
+    expect(res.status).toBe(200);
+    expect(h.fake.commands()).toEqual(['kick "Lena" Zeit fürs Abendessen!']);
+    expect(h.fake.state.players).toEqual(["Tom"]);
+  });
+
+  it.each([{}, { reason: "" }])("kickt ohne Nachricht nur mit dem Namen (%j)", async (extra) => {
+    h.fake.state.players = ["Lena"];
+
+    const res = await h.request("/api/players/kick", { method: "POST", body: { name: "Lena", ...extra } });
+
+    expect(res.status).toBe(200);
+    expect(h.fake.commands()).toEqual(['kick "Lena"']);
+    expect(h.fake.state.players).toEqual([]);
+  });
+
+  it("antwortet 409, wenn der Server nicht läuft", async () => {
+    h.fake.state.status = "STOPPED";
+
+    const res = await h.request("/api/players/kick", { method: "POST", body: { name: "Lena" } });
+
+    expect(res.status).toBe(409);
+    expect(h.fake.commands()).toEqual([]);
+  });
+
+  it("antwortet 404, wenn der Spieler nicht online ist", async () => {
+    h.fake.state.players = ["Tom"];
+    h.fake.state.knownPlayers = [{ name: "Lena", xuid: "2000" }];
+
+    const res = await h.request("/api/players/kick", { method: "POST", body: { name: "Lena" } });
+
+    expect(res.status).toBe(404);
+    expect(h.fake.commands()).toEqual([]);
+    expect(h.fake.state.players).toEqual(["Tom"]);
+  });
+
+  it.each([
+    { name: "Lena", reason: 'Sag "Tschüss"' },
+    { name: "Lena", reason: "Tschüss'" },
+    { name: "Lena", reason: "Tschüss\nop Lena" },
+    { name: "Lena", reason: "Tschüss\n" },
+    { name: "Lena", reason: "x".repeat(81) },
+    { name: "Lena", reason: 42 },
+    { name: 'Lena"' },
+    { name: "" },
+    { reason: "Tschüss" }
+  ])("lehnt %j ab und schickt keinen Befehl", async (body) => {
+    h.fake.state.players = ["Lena"];
+
+    const res = await h.request("/api/players/kick", { method: "POST", body });
+
+    expect(res.status).toBe(400);
+    expect(h.fake.commands()).toEqual([]);
+    expect(h.fake.state.players).toEqual(["Lena"]);
+  });
+
+  it("80 Zeichen Nachricht sind erlaubt", async () => {
+    h.fake.state.players = ["Lena"];
+    const reason = "x".repeat(80);
+
+    const res = await h.request("/api/players/kick", { method: "POST", body: { name: "Lena", reason } });
+
+    expect(res.status).toBe(200);
+    expect(h.fake.commands()).toEqual([`kick "Lena" ${reason}`]);
+  });
+});
