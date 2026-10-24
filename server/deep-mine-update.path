@@ -1,0 +1,9 @@
+[Unit]
+Description=Update-Anfragen von Deep Mine Control (System → Updates)
+
+[Path]
+PathChanged=/var/lib/bsm/deep-mine-control/update-request.json
+Unit=deep-mine-update.service
+
+[Install]
+WantedBy=paths.target

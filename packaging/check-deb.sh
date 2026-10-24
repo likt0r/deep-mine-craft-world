@@ -22,14 +22,14 @@ has "$APP/server/index.mjs"
 has "$APP/nitro.json"
 grep -q " $APP/public/_nuxt/" <<<"$LIST" || fail "Seiten fehlen: $APP/public/_nuxt/"
 
-for helper in deep-mine-ethernet deep-mine-wifi-check deep-mine-smart-status; do
+for helper in deep-mine-ethernet deep-mine-wifi-check deep-mine-smart-status deep-mine-update; do
   executable "/usr/lib/deep-mine-control/bin/$helper"
 done
 
 for unit in bsm.service deep-mine-control.service deep-mine-backup-on-shutdown.service deep-mine-ethernet.path \
   deep-mine-ethernet.service deep-mine-smart.service deep-mine-smart.timer deep-mine-wifi-check.service \
-  deep-mine-wifi-check.timer deep-mine-update-check.service deep-mine-update-check.timer \
-  caddy.service.d/deep-mine-control.conf; do
+  deep-mine-wifi-check.timer deep-mine-update-check.service deep-mine-update-check.timer deep-mine-update.path \
+  deep-mine-update.service caddy.service.d/deep-mine-control.conf; do
   has "/usr/lib/systemd/system/$unit"
 done
 

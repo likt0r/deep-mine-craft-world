@@ -1,0 +1,8 @@
+[Unit]
+Description=Update von Deep Mine Control starten (Deep Mine Control)
+
+[Service]
+Type=oneshot
+# Prüft die Anfrage und startet die Arbeit als transiente Unit deep-mine-update-run, dann ist dieser Dienst fertig.
+# So beendet das Neustarten der Dienste durch das Paket das Update nicht.
+ExecStart=/usr/lib/deep-mine-control/bin/deep-mine-update run

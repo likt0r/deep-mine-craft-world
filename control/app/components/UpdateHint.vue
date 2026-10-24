@@ -36,7 +36,8 @@ const open = ref(false);
 
 async function confirm() {
   try {
-    await $fetch("/api/updates/minecraft", { method: "POST" });
+    if (props.update.kind === "minecraft") await $fetch("/api/updates/minecraft", { method: "POST" });
+    else await $fetch("/api/updates/control", { method: "POST" });
     open.value = false;
     feedback.done(`${props.update.label} wird installiert …`);
     await refresh();

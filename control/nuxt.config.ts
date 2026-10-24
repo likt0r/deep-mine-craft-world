@@ -39,6 +39,9 @@ export default defineNuxtConfig({
     worldMaxBytes: 4 * 1024 ** 3,
     /** Download-Links von Mojang. Daraus kommt die neueste Version des Minecraft-Servers (Linux). */
     mojangLinksUrl: "https://net-secondary.web.minecraft-services.net/api/v1.0/download/links",
+    /** GitHub-API und Repo: Das neueste Release mit Paket ist die neueste Version von Deep Mine Control. */
+    githubApi: "https://api.github.com",
+    updateRepo: "likt0r/deep-mine-craft-world",
     /** Länge einer Countdown-Sekunde beim Weltwechsel. Tests setzen 0. */
     countdownStepMs: 1000,
     /** So lange wartet das Auslesen der Spielregeln auf die Ausgabe von `gamerule`. */

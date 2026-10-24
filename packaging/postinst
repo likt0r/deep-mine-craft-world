@@ -10,7 +10,8 @@ BSM_VENV=/opt/bsm/.venv
 BSM_DB=/var/lib/bsm/config/bedrock-server-manager.db
 UNITS="bsm.service deep-mine-control.service deep-mine-backup-on-shutdown.service deep-mine-ethernet.path
 deep-mine-ethernet.service deep-mine-smart.service deep-mine-smart.timer deep-mine-wifi-check.service
-deep-mine-wifi-check.timer deep-mine-update-check.service deep-mine-update-check.timer"
+deep-mine-wifi-check.timer deep-mine-update-check.service deep-mine-update-check.timer deep-mine-update.path
+deep-mine-update.service"
 
 # systemd läuft (nicht in einem Container oder chroot)
 systemd_running() { [ -d /run/systemd/system ]; }
@@ -95,14 +96,16 @@ fi
 
 # --- Dienste ---
 systemctl enable --quiet bsm.service deep-mine-control.service deep-mine-smart.timer deep-mine-wifi-check.timer deep-mine-update-check.timer \
-  deep-mine-ethernet.path deep-mine-backup-on-shutdown.service
+  deep-mine-ethernet.path deep-mine-update.path deep-mine-backup-on-shutdown.service
 if systemd_running; then
   systemctl start bsm.service
   if [ "$ROLE_CHANGED" = 1 ]; then systemctl restart bsm.service; fi
-  systemctl start deep-mine-smart.timer deep-mine-wifi-check.timer deep-mine-update-check.timer deep-mine-ethernet.path
+  systemctl start deep-mine-smart.timer deep-mine-wifi-check.timer deep-mine-update-check.timer deep-mine-ethernet.path \
+    deep-mine-update.path
   # Nur starten (ExecStart tut nichts), nie neu starten: ein Stopp würde sonst schon jetzt sichern.
   systemctl start deep-mine-backup-on-shutdown.service
   systemctl start deep-mine-smart.service || echo "Hinweis: SMART-Werte konnten nicht gelesen werden."
+  # Läuft gerade ein Update per Knopf (transiente Unit deep-mine-update-run), wartet es auf genau diesen Neustart.
   systemctl restart deep-mine-control.service
   # caddy.service liest über das Drop-in jetzt /usr/lib/deep-mine-control/Caddyfile.
   systemctl restart caddy.service

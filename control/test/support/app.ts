@@ -57,6 +57,8 @@ export async function startApp(fake: FakeBsm, fixture: ServerFixture, port?: num
       NUXT_COUNTDOWN_STEP_MS: "0",
       // Das Fake-BSM spielt auch die Download-Links von Mojang.
       NUXT_MOJANG_LINKS_URL: `${fake.url}/mojang/links`,
+      // … und die GitHub-API (Releases von Deep Mine Control).
+      NUXT_GITHUB_API: `${fake.url}/github`,
       NUXT_RULES_WAIT_MS: "4000"
     },
     stdio: ["ignore", "inherit", "inherit"]

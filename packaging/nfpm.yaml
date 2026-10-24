@@ -42,6 +42,9 @@ contents:
   - src: server/smart-status.sh
     dst: /usr/lib/deep-mine-control/bin/deep-mine-smart-status
     file_info: { mode: 0755 }
+  - src: server/update.py
+    dst: /usr/lib/deep-mine-control/bin/deep-mine-update
+    file_info: { mode: 0755 }
 
   # systemd-Units
   - src: server/bsm.service
@@ -58,6 +61,10 @@ contents:
     dst: /usr/lib/systemd/system/deep-mine-smart.service
   - src: server/deep-mine-smart.timer
     dst: /usr/lib/systemd/system/deep-mine-smart.timer
+  - src: server/deep-mine-update.path
+    dst: /usr/lib/systemd/system/deep-mine-update.path
+  - src: server/deep-mine-update.service
+    dst: /usr/lib/systemd/system/deep-mine-update.service
   - src: server/deep-mine-update-check.service
     dst: /usr/lib/systemd/system/deep-mine-update-check.service
   - src: server/deep-mine-update-check.timer

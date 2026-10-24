@@ -14,6 +14,25 @@ watch(
 );
 
 const UNKNOWN = "unbekannt";
+const control = computed(() => info.value?.control ?? null);
+/** Laufendes oder zuletzt gescheitertes Update von Deep Mine Control */
+const controlRun = computed(() => (info.value?.running?.kind === "control" ? info.value.running : null));
+const controlInProgress = computed(() => !!controlRun.value && controlRun.value.phase !== "failed");
+/** Nicht, solange schon ein Update oder Weltvorgang läuft: Deep Mine Control startet dabei neu. */
+const controlLocked = computed(
+  () => connection.value !== "ok" || !!status.value?.busy || !!status.value?.updating
+);
+
+async function updateControl() {
+  try {
+    await $fetch("/api/updates/control", { method: "POST" });
+    feedback.done("Deep Mine Control wird aktualisiert …");
+    await Promise.all([refresh(), refreshStatus()]);
+  } catch {
+    feedback.failed();
+  }
+}
+
 const minecraft = computed(() => info.value?.minecraft ?? null);
 /** Laufendes oder zuletzt gescheitertes Minecraft-Update */
 const run = computed(() => (info.value?.running?.kind === "minecraft" ? info.value.running : null));
@@ -67,6 +86,111 @@ async function updateMinecraft() {
 
 <template>
   <div class="flex flex-col gap-3.5">
+    <SystemCard title="Deep Mine Control" icon="i-lucide-tablet-smartphone" data-testid="updates-control">
+      <dl
+        class="grid grid-cols-[1fr_auto] text-[15px] [&>*]:border-b [&>*]:border-default [&>*]:py-2.5 [&>*:nth-last-child(-n+2)]:border-b-0"
+      >
+        <dt class="text-muted">Installiert</dt>
+        <dd class="text-right font-semibold" data-testid="updates-control-current">
+          {{ control?.current ?? UNKNOWN }}
+        </dd>
+        <dt class="text-muted">Neueste</dt>
+        <dd class="text-right font-semibold" data-testid="updates-control-latest">
+          {{ control?.latest ?? UNKNOWN }}
+        </dd>
+      </dl>
+
+      <UAlert
+        v-if="info?.errors.control"
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-cloud-off"
+        title="Prüfen hat nicht geklappt"
+        :description="info.errors.control"
+        data-testid="updates-control-error"
+      />
+
+      <template v-if="controlInProgress">
+        <div
+          class="flex items-center gap-2.5 rounded-lg border border-warning/30 bg-warning/10 p-3 text-warning"
+          data-testid="updates-control-running"
+        >
+          <UIcon name="i-lucide-loader-circle" class="size-5 shrink-0 animate-spin" />
+          <span class="flex min-w-0 flex-col">
+            <span class="font-semibold">Deep Mine Control wird aktualisiert …</span>
+            <span class="text-sm text-toned">{{ updatePhaseLabel(controlRun!.phase) }}</span>
+          </span>
+        </div>
+        <p class="text-sm text-muted">
+          Deep Mine Control startet dabei neu, die Seite lädt danach von selbst.
+        </p>
+      </template>
+
+      <template v-else-if="control?.available">
+        <UAlert
+          v-if="control.failed"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-circle-alert"
+          :title="`Update auf ${control.failed} ist fehlgeschlagen`"
+          :description="controlRun?.error ?? undefined"
+          data-testid="updates-control-failed"
+        />
+        <p class="text-toned" data-testid="updates-control-available">
+          <strong class="text-highlighted">Version {{ control.latest }}</strong> ist da.
+        </p>
+        <p class="text-sm text-muted">
+          Deep Mine Control startet dabei neu, die Seite lädt danach von selbst. Minecraft läuft weiter,
+          niemand wird getrennt.
+        </p>
+        <HoldButton
+          :label="control.failed ? 'Erneut versuchen' : 'Jetzt aktualisieren'"
+          icon="i-lucide-download"
+          color="warning"
+          :disabled="controlLocked"
+          data-testid="updates-control-update"
+          @confirm="updateControl"
+        />
+        <p class="text-center text-sm text-muted">3 Sekunden gedrückt halten.</p>
+      </template>
+
+      <p v-else-if="control?.latest && control.current === 'dev'" class="text-sm text-muted">
+        Entwicklungsstand ohne Paket: Aktualisieren geht nur mit installiertem Paket.
+      </p>
+      <p
+        v-else-if="control?.latest"
+        class="flex items-center gap-2 font-semibold text-success"
+        data-testid="updates-control-uptodate"
+      >
+        <UIcon name="i-lucide-circle-check" class="size-5" />
+        Deep Mine Control ist aktuell.
+      </p>
+
+      <!-- Nur Text: Die Änderungsliste kommt aus GitHub, deshalb kein v-html. -->
+      <details
+        v-if="control?.notes"
+        class="group border-t border-default pt-3"
+        data-testid="updates-control-notes"
+      >
+        <summary class="flex cursor-pointer list-none items-center gap-2 font-semibold">
+          <UIcon
+            name="i-lucide-chevron-right"
+            class="size-5 shrink-0 transition-transform group-open:rotate-90"
+          />
+          Änderungen in {{ control.latest }}
+          <span v-if="control.publishedAt" class="ms-auto text-sm font-normal text-muted">
+            {{ formatWhen(control.publishedAt) }}
+          </span>
+        </summary>
+        <p
+          class="mt-2 text-sm break-words whitespace-pre-wrap text-toned"
+          data-testid="updates-control-notes-text"
+        >
+          {{ control.notes }}
+        </p>
+      </details>
+    </SystemCard>
+
     <SystemCard title="Minecraft-Server" icon="i-lucide-pickaxe" data-testid="updates-minecraft">
       <dl
         class="grid grid-cols-[1fr_auto] text-[15px] [&>*]:border-b [&>*]:border-default [&>*]:py-2.5 [&>*:nth-last-child(-n+2)]:border-b-0"
@@ -79,19 +203,15 @@ async function updateMinecraft() {
         <dd class="text-right font-semibold" data-testid="updates-minecraft-latest">
           {{ minecraft?.latest ?? UNKNOWN }}
         </dd>
-        <dt class="text-muted">Zuletzt geprüft</dt>
-        <dd class="text-right font-semibold" data-testid="updates-checked-at">
-          {{ info?.checkedAt ? formatWhen(info.checkedAt) : "noch nie" }}
-        </dd>
       </dl>
 
       <UAlert
-        v-if="info?.error"
+        v-if="info?.errors.minecraft"
         color="warning"
         variant="subtle"
         icon="i-lucide-cloud-off"
         title="Prüfen hat nicht geklappt"
-        :description="`${info.error} Ohne Internet (nur eigenes WLAN) lässt sich nicht prüfen, ob es eine neue Version gibt.`"
+        :description="info.errors.minecraft"
         data-testid="updates-error"
       />
 
@@ -182,7 +302,19 @@ async function updateMinecraft() {
       <p class="text-sm text-muted">
         Jede Stunde wird geprüft. Ein neues Minecraft wird nur installiert, wenn gerade niemand spielt.
       </p>
+    </SystemCard>
 
+    <!-- Geprüft wird beides zusammen. -->
+    <div class="flex flex-col gap-2.5">
+      <p class="text-sm text-muted">
+        Zuletzt geprüft:
+        <span class="font-semibold text-toned" data-testid="updates-checked-at">
+          {{ info?.checkedAt ? formatWhen(info.checkedAt) : "noch nie" }}
+        </span>
+        <template v-if="info?.error">
+          · Ohne Internet (nur eigenes WLAN) lässt sich nicht prüfen, ob es neue Versionen gibt.
+        </template>
+      </p>
       <UButton
         icon="i-lucide-refresh-cw"
         color="neutral"
@@ -196,6 +328,6 @@ async function updateMinecraft() {
       >
         Jetzt prüfen
       </UButton>
-    </SystemCard>
+    </div>
   </div>
 </template>

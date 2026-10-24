@@ -65,7 +65,8 @@ describe("GET /api/status", () => {
     const res = await h.request("/api/status");
 
     expect(res.status).toBe(503);
-    expect(res.body.data).toEqual({ reason: "bsm" });
+    // Die Version steht dabei: Nach einem Update wartet deep-mine-update auf sie.
+    expect(res.body.data).toEqual({ reason: "bsm", version: "1.2.3" });
   });
 
   it("meldet sich nach abgelaufenem Token einmal neu an und wiederholt die Anfrage", async () => {

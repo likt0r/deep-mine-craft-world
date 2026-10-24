@@ -1,4 +1,4 @@
-/** Was sich aktualisieren lässt. Deep Mine Control („control“) kommt mit einem späteren Ticket dazu. */
+/** Was sich aktualisieren lässt: Deep Mine Control oder der Minecraft-Server. */
 export type UpdateKind = "minecraft" | "control";
 
 /** Installierte und neueste Version von Deep Mine Control oder vom Minecraft-Server. */
@@ -16,13 +16,25 @@ export interface VersionInfo {
   failed: string | null;
 }
 
+/** Deep Mine Control: dazu die Änderungsliste des neuesten Release. */
+export type ControlVersionInfo = VersionInfo & {
+  /** Änderungsliste des neuesten Release (Text), `null`: keine oder nicht geprüft */
+  notes: string | null;
+  /** Veröffentlicht am (ISO), `null`: unbekannt */
+  publishedAt: string | null;
+};
+
 /**
- * Ein Update, das läuft oder gescheitert ist. Minecraft: countdown: Countdown im Chat (wenn jemand spielt);
- * updating: BSM stoppt, sichert, installiert und startet; failed: gescheitert, `error` nennt den Grund.
+ * Ein Update, das läuft oder gescheitert ist. failed: gescheitert, `error` nennt den Grund.
+ * - Minecraft: countdown: Countdown im Chat (wenn jemand spielt); updating: BSM stoppt, sichert, installiert
+ *   und startet.
+ * - Deep Mine Control (root-Helfer deep-mine-update): downloading: Paket wird geladen und geprüft;
+ *   installing: wird installiert, Deep Mine Control startet dabei neu; verifying: wartet, bis die neue
+ *   Version antwortet. Ist sie zurückgesetzt worden, heißt das hier auch failed, `error` sagt es.
  */
 export interface UpdateRun {
   kind: UpdateKind;
-  phase: "countdown" | "updating" | "failed";
+  phase: "countdown" | "updating" | "downloading" | "installing" | "verifying" | "failed";
   error: string | null;
 }
 
@@ -33,12 +45,19 @@ export interface AutoUpdateSettings {
 }
 
 export interface UpdatesInfo {
+  /** Deep Mine Control: installiert laut Versionsdatei („dev“ ohne Paket), neueste laut GitHub-Release mit Paket */
+  control: ControlVersionInfo;
   minecraft: VersionInfo;
-  /** Zeitpunkt der letzten Prüfung (ISO), `null`: noch nie */
+  /** Zeitpunkt der letzten Prüfung (ISO), `null`: noch nie. GitHub und Mojang werden zusammen geprüft. */
   checkedAt: string | null;
-  /** Warum die letzte Prüfung gescheitert ist, z. B. ohne Internet */
+  /** Je Teil, warum die letzte Prüfung gescheitert ist, z. B. ohne Internet. Die andere Prüfung gilt trotzdem. */
+  errors: Record<UpdateKind, string | null>;
+  /** Beide Gründe aus `errors` in einem Text, `null`: beide Prüfungen gingen */
   error: string | null;
-  /** Laufendes oder zuletzt gescheitertes Update. Nach Erfolg wieder `null`. */
+  /**
+   * Laufendes oder zuletzt gescheitertes Update. Ein laufendes geht vor, Minecraft vor Deep Mine Control.
+   * Nach Erfolg wieder `null`.
+   */
   running: UpdateRun | null;
   auto: AutoUpdateSettings;
 }
