@@ -15,6 +15,10 @@ export default defineEventHandler(async (event) => {
   if (!body.success) throw createError({ statusCode: 400, message: "Ungültige Angabe" });
 
   const { closed, newPlayers, onlineNotListed } = body.data;
+  const running = mapServerState((await bsm.summary()).status) === "running";
+  // Öffnen startet neu (siehe unten). Ein Weltvorgang startet ohnehin neu, ein zweiter Neustart käme dazwischen.
+  if (closed === false && running && isWorldOperationRunning())
+    throw createError({ statusCode: 409, message: "Gerade läuft ein Weltvorgang" });
 
   if (closed === true) {
     const { players } = await readPlayers();
@@ -41,11 +45,11 @@ export default defineEventHandler(async (event) => {
   if (newPlayers !== undefined) properties["default-player-permission-level"] = newPlayers;
   if (Object.keys(properties).length > 0) await bsm.setProperties(properties);
 
-  // `allowlist on|off` wirkt nur am laufenden Server, die Eigenschaft gilt ab dem nächsten Start.
-  if (closed !== undefined) {
-    const { status } = await bsm.summary();
-    if (mapServerState(status) === "running") await bsm.sendCommand(`allowlist ${closed ? "on" : "off"}`);
-  }
+  // Die Eigenschaft gilt ab dem nächsten Start. Schließen geht sofort mit `allowlist on`. `allowlist off` sperrt
+  // BSM für send_command, deshalb startet Öffnen neu. BSM antwortet erst, wenn der Server wieder läuft.
+  if (running && closed === true) await bsm.sendCommand("allowlist on");
+  const restarting = running && closed === false;
+  if (restarting) bsm.restart().catch((error) => console.error("Neustart fehlgeschlagen:", error));
 
-  return { ok: true };
+  return { ok: true, restarting };
 });

@@ -19,6 +19,7 @@ const banned = computed(() => players.value.filter((p) => !p.online && p.banned)
 const seen = computed(() => players.value.filter((p) => !p.online && !p.banned && !p.whitelisted));
 
 const feedback = useFeedback();
+const { status, refresh: refreshStatus } = useServerStatus();
 const closed = computed(() => data.value?.closed ?? false);
 const newPlayers = computed(() => data.value?.newPlayers ?? "member");
 const unlistedOnline = computed(() =>
@@ -26,6 +27,7 @@ const unlistedOnline = computed(() =>
 );
 const accessBusy = ref(false);
 const askClose = ref(false);
+const askOpen = ref(false);
 
 type AccessBody = {
   closed?: boolean;
@@ -36,11 +38,18 @@ type AccessBody = {
 async function setAccess(body: AccessBody) {
   accessBusy.value = true;
   try {
-    await $fetch("/api/players/access", { method: "PUT", body });
+    const { restarting } = await $fetch("/api/players/access", { method: "PUT", body });
     askClose.value = false;
-    await refresh();
+    askOpen.value = false;
+    await Promise.all([refresh(), refreshStatus()]);
     if (body.closed !== undefined)
-      feedback.done(body.closed ? "Zugang ist geschlossen." : "Zugang ist offen.");
+      feedback.done(
+        body.closed
+          ? "Zugang ist geschlossen."
+          : restarting
+            ? "Zugang ist offen. Minecraft startet neu …"
+            : "Zugang ist offen."
+      );
     else if (body.newPlayers) {
       feedback.done(
         body.newPlayers === "visitor" ? "Neue Spieler sind Besucher." : "Neue Spieler sind Mitglieder."
@@ -67,6 +76,11 @@ function chooseClosed(value: boolean) {
   // Beim Schließen erst fragen, wenn jemand online ist, der nicht auf der Whitelist steht.
   if (value && unlistedOnline.value.length > 0) {
     askClose.value = true;
+    return;
+  }
+  // Öffnen geht nur mit Neustart, solange der Server läuft.
+  if (!value && closed.value && status.value?.state === "running") {
+    askOpen.value = true;
     return;
   }
   void setAccess({ closed: value });
@@ -285,6 +299,42 @@ watch([data, selected], () => {
     </details>
 
     <PlayerSheet :player="selectedPlayer" @close="closeSheet" />
+
+    <UDrawer
+      v-model:open="askOpen"
+      handleOnly
+      title="Zugang öffnen"
+      :ui="{
+        content: 'bg-muted',
+        container: 'mx-auto w-full max-w-lg pb-[calc(1rem+env(safe-area-inset-bottom))]'
+      }"
+    >
+      <template #body>
+        <div class="flex flex-col gap-3" data-testid="access-open-dialog">
+          <p>Minecraft startet dafür neu. Wer gerade spielt, wird kurz getrennt.</p>
+          <UButton
+            icon="i-lucide-door-open"
+            size="lg"
+            class="block-btn font-semibold"
+            :loading="accessBusy"
+            data-testid="access-open-confirm"
+            @click="setAccess({ closed: false })"
+          >
+            Öffnen und neu starten
+          </UButton>
+          <UButton
+            color="neutral"
+            variant="ghost"
+            size="lg"
+            class="block-btn"
+            data-testid="access-open-cancel"
+            @click="askOpen = false"
+          >
+            Abbrechen
+          </UButton>
+        </div>
+      </template>
+    </UDrawer>
 
     <UDrawer
       v-model:open="askClose"
