@@ -242,6 +242,23 @@ test("Deep Mine Control per Halten: Anfrage geschrieben, Fortschritt und Statusl
   await expect(bar).toContainText("Deep Mine Control wird aktualisiert");
 });
 
+test("Deep Mine Control startet neu: keine „Keine Verbindung“, sondern der Neustart", async ({ page }) => {
+  await offerControl(page, CONTROL_NEWER);
+  helperState("installing");
+  await page.goto("/system/updates");
+  const bar = page.getByTestId("status-bar");
+  await expect(bar).toContainText("Deep Mine Control wird aktualisiert");
+
+  // apt startet Deep Mine Control neu: Für ein paar Sekunden antwortet niemand.
+  await page.route("**/api/status", (route) => route.abort("connectionrefused"));
+  await expect(bar).toContainText("Deep Mine Control startet neu …", { timeout: 10_000 });
+  await expect(bar).toHaveAttribute("data-state", "updating");
+
+  await page.unroute("**/api/status");
+  rmSync(join(DATA, "update-state.json"));
+  await expect(bar).toHaveAttribute("data-state", "running", { timeout: 10_000 });
+});
+
 test("Deep Mine Control zurückgesetzt: Grund und „Erneut versuchen“", async ({ page }) => {
   await offerControl(page, CONTROL_NEWER);
   helperState(
