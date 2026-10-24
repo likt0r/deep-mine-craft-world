@@ -1,6 +1,13 @@
 <script setup lang="ts">
 defineProps<{ player: PlayerInfo }>();
 const emit = defineEmits<{ open: [] }>();
+
+/** „Hat alles angezündet · seit 24.10.2026“ */
+function banLine(banned: NonNullable<PlayerInfo["banned"]>) {
+  const parts = [banned.reason ?? "Gesperrt"];
+  if (banned.since) parts.push(`seit ${formatDate(banned.since)}`);
+  return parts.join(" · ");
+}
 </script>
 
 <template>
@@ -14,7 +21,12 @@ const emit = defineEmits<{ open: [] }>();
       <PlayerAvatar :name="player.name" />
       <span class="flex min-w-0 flex-1 flex-col">
         <span class="truncate font-semibold">{{ player.name }}</span>
-        <span v-if="player.online && player.whitelisted" class="text-sm text-muted">Auf der Whitelist</span>
+        <span v-if="player.banned" class="truncate text-sm text-error" data-testid="player-row-ban">
+          {{ banLine(player.banned) }}
+        </span>
+        <span v-else-if="player.online && player.whitelisted" class="text-sm text-muted"
+          >Auf der Whitelist</span
+        >
       </span>
       <UIcon name="i-lucide-chevron-right" class="size-5 shrink-0 text-dimmed" />
     </button>

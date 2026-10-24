@@ -122,6 +122,14 @@ export const bsm = {
     }),
   allowlistRemove: (name: string) =>
     bsmFetch(serverPath("allowlist/remove"), { method: "DELETE", body: { players: [name] } }),
+  /** Gesperrte Spieler. BSM kickt sie bei jedem Spielerscan. `banned_at` ohne Zeitzone, z. B. „2026-10-24T12:00:00“. */
+  bans: () =>
+    bsmFetch<{
+      bans: { player_name: string; xuid: string; reason: string | null; banned_at: string | null }[];
+    }>(serverPath("bans/get")).then((r) => r.bans),
+  ban: (name: string, xuid: string, reason: string | null) =>
+    bsmFetch(serverPath("bans/add"), { method: "POST", body: { player_name: name, xuid, reason } }),
+  unban: (xuid: string) => bsmFetch(serverPath("bans/remove"), { method: "DELETE", body: { xuid } }),
   /** Alle Spieler, die BSM je in den Server-Logs gesehen hat, mit XUID. */
   knownPlayers: () =>
     bsmFetch<{ players: { name: string; xuid: string }[] }>("/api/players/get").then((r) => r.players)

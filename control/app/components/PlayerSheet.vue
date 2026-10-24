@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Aktionsmenü von unten für einen Spieler: Whitelist und Kicken. Weitere Aktionen (Recht, Sperren) kommen als
+ * Aktionsmenü von unten für einen Spieler: Whitelist, Kicken, Sperren und Entsperren. Weitere Aktionen (Recht, Sperren) kommen als
  * eigene Abschnitte im Menü und, wenn sie eine Eingabe brauchen, als eigene Ansicht dazu.
  */
 const props = defineProps<{ player: PlayerInfo | null }>();
@@ -10,7 +10,7 @@ const feedback = useFeedback();
 const setWhitelisted = useWhitelist();
 
 /** Was im Sheet gerade zu sehen ist. */
-const view = ref<"menu" | "kick">("menu");
+const view = ref<"menu" | "kick" | "ban">("menu");
 const busy = ref(false);
 const reason = ref("");
 const reasonValid = computed(() => isValidPlayerMessage(reason.value));
@@ -35,7 +35,7 @@ watch(
 watch(
   () => props.player?.online,
   (online) => {
-    if (!online) view.value = "menu";
+    if (!online && view.value === "kick") view.value = "menu";
   }
 );
 
@@ -64,6 +64,50 @@ async function kick() {
     if (status === 409) feedback.failed("Der Server läuft gerade nicht.");
     else if (status === 404) feedback.failed(`${name} ist nicht mehr online.`);
     else feedback.failed();
+  } finally {
+    busy.value = false;
+  }
+  await refreshNuxtData("players");
+}
+
+// --- Sperren und Entsperren ---
+
+/** „Grund: Hat alles angezündet · seit 24.10.2026“ */
+function banDescription(banned: NonNullable<PlayerInfo["banned"]>) {
+  const reasonText = banned.reason ? `Grund: ${banned.reason}` : "Ohne Grund";
+  return banned.since ? `${reasonText} · seit ${formatDate(banned.since)}` : reasonText;
+}
+
+function startBan() {
+  reason.value = "";
+  view.value = "ban";
+}
+
+async function ban() {
+  if (!props.player?.xuid || !reasonValid.value) return;
+  const { name, xuid } = props.player;
+  busy.value = true;
+  try {
+    await $fetch("/api/players/ban", { method: "POST", body: { xuid, reason: reason.value } });
+    emit("close");
+    feedback.done(`${name} ist gesperrt.`);
+  } catch {
+    feedback.failed();
+  } finally {
+    busy.value = false;
+  }
+  await refreshNuxtData("players");
+}
+
+async function unban() {
+  if (!props.player?.xuid) return;
+  const { name, xuid } = props.player;
+  busy.value = true;
+  try {
+    await $fetch("/api/players/ban", { method: "DELETE", body: { xuid } });
+    feedback.done(`${name} ist entsperrt.`);
+  } catch {
+    feedback.failed();
   } finally {
     busy.value = false;
   }
@@ -107,6 +151,7 @@ async function kick() {
       <div v-if="player" class="flex flex-col gap-3" data-testid="player-sheet" :data-player="player.name">
         <template v-if="view === 'menu'">
           <div
+            v-if="!player.banned"
             class="flex min-h-16 items-center gap-3 rounded-xl border border-default bg-default px-3.5 py-2"
           >
             <span
@@ -131,7 +176,7 @@ async function kick() {
           </div>
 
           <UButton
-            v-if="player.online"
+            v-if="player.online && !player.banned"
             data-testid="player-kick"
             icon="i-lucide-log-out"
             color="warning"
@@ -143,6 +188,52 @@ async function kick() {
           >
             Kicken
           </UButton>
+
+          <template v-if="player.banned">
+            <UAlert
+              color="error"
+              variant="subtle"
+              icon="i-lucide-ban"
+              title="Gesperrt"
+              :description="banDescription(player.banned)"
+              data-testid="player-banned"
+            />
+            <UButton
+              data-testid="player-unban"
+              icon="i-lucide-undo-2"
+              color="neutral"
+              variant="subtle"
+              size="xl"
+              block
+              class="block-btn"
+              :loading="busy"
+              :disabled="busy"
+              @click="unban"
+            >
+              Entsperren
+            </UButton>
+            <p class="text-center text-sm text-muted">
+              Danach steht {{ player.name }} nicht auf der Whitelist.
+            </p>
+          </template>
+          <template v-else>
+            <UButton
+              data-testid="player-ban"
+              icon="i-lucide-ban"
+              color="error"
+              variant="subtle"
+              size="xl"
+              block
+              class="block-btn"
+              :disabled="!player.xuid"
+              @click="startBan"
+            >
+              Sperren
+            </UButton>
+            <p v-if="!player.xuid" class="text-center text-sm text-muted" data-testid="player-ban-hint">
+              Erst möglich, wenn der Spieler einmal da war.
+            </p>
+          </template>
         </template>
 
         <form v-else-if="view === 'kick'" class="flex flex-col gap-3" @submit.prevent="kick">
@@ -190,6 +281,46 @@ async function kick() {
             </UButton>
           </div>
         </form>
+
+        <div v-else-if="view === 'ban'" class="flex flex-col gap-3">
+          <p class="text-muted">
+            {{ player.name }} fliegt sofort raus und kann nicht mehr beitreten, auch nicht über die Whitelist.
+          </p>
+          <UFormField
+            label="Grund"
+            hint="freiwillig"
+            size="xl"
+            :error="reasonValid ? false : `Höchstens ${PLAYER_MESSAGE_MAX} Zeichen, ohne Anführungszeichen.`"
+          >
+            <UInput
+              v-model="reason"
+              data-testid="player-ban-reason"
+              :maxlength="PLAYER_MESSAGE_MAX"
+              placeholder="z. B. Hat alles angezündet"
+              size="xl"
+              class="w-full"
+              autocomplete="off"
+            />
+          </UFormField>
+          <HoldButton
+            label="Halten: Sperren"
+            icon="i-lucide-ban"
+            data-testid="player-ban-confirm"
+            :disabled="busy || !reasonValid"
+            @confirm="ban"
+          />
+          <UButton
+            color="neutral"
+            variant="subtle"
+            size="xl"
+            block
+            class="block-btn"
+            :disabled="busy"
+            @click="view = 'menu'"
+          >
+            Abbrechen
+          </UButton>
+        </div>
       </div>
     </template>
   </UDrawer>

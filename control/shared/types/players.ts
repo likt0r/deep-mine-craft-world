@@ -1,4 +1,4 @@
-/** Ein Spieler, wie Deep Mine Control ihn aus Online-Liste, bekannten Spielern und Whitelist zusammenführt. */
+/** Ein Spieler, wie Deep Mine Control ihn aus Online-Liste, bekannten Spielern, Whitelist und Sperren zusammenführt. */
 export interface PlayerInfo {
   /** Gamertag in der Schreibweise aus dem Spiel, sonst wie eingetragen */
   name: string;
@@ -6,6 +6,8 @@ export interface PlayerInfo {
   xuid: string | null;
   online: boolean;
   whitelisted: boolean;
+  /** Gesperrt, mit Grund und Zeitpunkt aus BSM (ohne Zeitzone), sonst `null` */
+  banned: { reason: string | null; since: string | null } | null;
 }
 
 export interface PlayersInfo {

@@ -9,12 +9,16 @@ export const playerMessage = z
   .refine(isValidPlayerMessage)
   .transform((text) => text.trim());
 
-/** Online-Spieler, bekannte Spieler und Whitelist als eine Liste. Gleiche Gamertags in anderer Schreibweise sind ein Spieler. */
+/**
+ * Online-Spieler, bekannte Spieler, Whitelist und Sperren als eine Liste. Gleiche Gamertags in anderer Schreibweise
+ * sind ein Spieler.
+ */
 export async function readPlayers(): Promise<PlayersInfo> {
-  const [summary, known, allowlist, properties] = await Promise.all([
+  const [summary, known, allowlist, bans, properties] = await Promise.all([
     bsm.summary(),
     bsm.knownPlayers(),
     bsm.allowlist(),
+    bsm.bans(),
     bsm.getProperties()
   ]);
   const byName = new Map<string, PlayerInfo>();
@@ -22,13 +26,19 @@ export async function readPlayers(): Promise<PlayersInfo> {
   const entry = (name: string, xuid?: string | null) => {
     const key = name.toLowerCase();
     let player = byName.get(key);
-    if (!player) byName.set(key, (player = { name, xuid: null, online: false, whitelisted: false }));
+    if (!player)
+      byName.set(key, (player = { name, xuid: null, online: false, whitelisted: false, banned: null }));
     player.xuid ??= xuid || null;
     return player;
   };
   for (const p of summary.players) entry(p.name, p.xuid).online = true;
   for (const p of known) entry(p.name, p.xuid);
   for (const p of allowlist) entry(p.name, p.xuid).whitelisted = true;
+  // Sperren gelten für die XUID. Wen BSM sonst nicht mehr kennt, der steht mit dem Namen aus der Sperre in der Liste.
+  for (const ban of bans) {
+    const player = [...byName.values()].find((p) => p.xuid === ban.xuid) ?? entry(ban.player_name, ban.xuid);
+    player.banned = { reason: ban.reason || null, since: ban.banned_at || null };
+  }
 
   const players = [...byName.values()].sort(
     (a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name, "de")

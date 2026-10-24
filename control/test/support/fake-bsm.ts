@@ -29,6 +29,8 @@ export interface FakeState {
   knownPlayers: { name: string; xuid: string }[];
   /** allowlist.json */
   allowlist: { name: string; xuid: string | null; ignoresPlayerLimit: boolean }[];
+  /** Gesperrte Spieler (`bans/get`). BSM kickt sie selbst bei jedem Spielerscan, das spielt der Fake nicht nach. */
+  bans: { player_name: string; xuid: string; reason: string | null; banned_at: string | null }[];
   properties: Record<string, string>;
   /**
    * Spielregeln, die auf `gamerule` ohne Argumente in die Server-Ausgabe geschrieben werden,
@@ -91,6 +93,7 @@ function initialState(): FakeState {
     players: [],
     knownPlayers: [],
     allowlist: [],
+    bans: [],
     properties: {
       "level-name": DEFAULT_LEVEL_NAME,
       gamemode: "creative",
@@ -371,6 +374,36 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
           }
         }
         return send(res, 200, { status: "success", message: "ok", details: { removed, not_found } });
+      }
+      case "GET bans/get":
+        return send(res, 200, { status: "success", message: null, bans: fake.state.bans });
+      case "POST bans/add": {
+        const ban = body as { player_name?: string; xuid?: string; reason?: string | null } | null;
+        if (!ban?.player_name || !ban.xuid)
+          return bsmError(res, 422, "validation_error", "API data failed validation.");
+        // Wie BSM: Zeitpunkt ohne Zeitzone, eine Sperre je XUID.
+        const entry = {
+          player_name: ban.player_name,
+          xuid: ban.xuid,
+          reason: ban.reason ?? null,
+          banned_at: new Date().toISOString().slice(0, 19)
+        };
+        fake.state.bans = [...fake.state.bans.filter((b) => b.xuid !== ban.xuid), entry];
+        return send(res, 200, {
+          status: "success",
+          message: `Player '${ban.player_name}' banned.`,
+          server_name: SERVER
+        });
+      }
+      case "DELETE bans/remove": {
+        const xuid = (body as { xuid?: string } | null)?.xuid;
+        if (!xuid) return bsmError(res, 422, "validation_error", "API data failed validation.");
+        fake.state.bans = fake.state.bans.filter((b) => b.xuid !== xuid);
+        return send(res, 200, {
+          status: "success",
+          message: `XUID '${xuid}' unbanned.`,
+          server_name: SERVER
+        });
       }
       case "POST backup/action": {
         // Wie BSM: <Ordner der aktiven Welt>_backup_<Zeit>_<hex>.mcworld im Backup-Ordner.

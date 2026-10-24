@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { fake } from "./fake";
 import { toast } from "./toast";
@@ -206,4 +206,110 @@ test("weist oben auf den Offline-Modus hin", async ({ page }) => {
   const hint = page.getByTestId("players-offline");
   await expect(hint).toContainText("Offline-Modus ist an");
   await expect(hint).toContainText("Whitelist und Sperren lassen sich umgehen.");
+});
+
+test.describe("Sperren", () => {
+  /** Hält einen Knopf 3 s gedrückt. hover() wartet, bis er ruhig steht. */
+  async function hold(page: Page, testId: string) {
+    await page.getByTestId(testId).hover();
+    await page.mouse.down();
+    await page.waitForTimeout(3200);
+    await page.mouse.up();
+  }
+
+  test("einen Online-Spieler mit Grund per Halten sperren", async ({ page }) => {
+    await fake.set({
+      players: ["Lena", "Tom"],
+      knownPlayers: [
+        { name: "Lena", xuid: "2000" },
+        { name: "Tom", xuid: "3000" }
+      ],
+      allowlist: [whitelistEntry("Lena")]
+    });
+    await page.goto("/spieler");
+
+    await page.locator('[data-testid="player-row"][data-player="Lena"]').click();
+    await page.getByTestId("player-ban").click();
+    await expect(page.getByTestId("player-sheet")).toContainText(
+      "Lena fliegt sofort raus und kann nicht mehr beitreten, auch nicht über die Whitelist."
+    );
+    const reason = page.getByTestId("player-ban-reason");
+    const confirm = page.getByTestId("player-ban-confirm");
+    await reason.fill('Sag "Tschüss"');
+    await expect(confirm).toBeDisabled();
+    await reason.fill("Hat alles angezündet");
+    await hold(page, "player-ban-confirm");
+
+    await expect(toast(page, "Lena ist gesperrt.")).toBeVisible();
+    await expect(page.getByTestId("player-sheet")).toBeHidden();
+    const state = await fake.get();
+    expect(state.bans).toEqual([
+      { player_name: "Lena", xuid: "2000", reason: "Hat alles angezündet", banned_at: expect.any(String) }
+    ]);
+    expect(state.allowlist).toEqual([]);
+    expect(await fake.commands()).toEqual(["allowlist reload", 'kick "Lena" Hat alles angezündet']);
+
+    const row = page.getByTestId("players-banned").getByTestId("player-row");
+    await expect(row).toHaveAttribute("data-player", "Lena");
+    await expect(row).toContainText("Hat alles angezündet");
+    await expect(page.getByTestId("players-online").getByTestId("player-row")).toHaveAttribute(
+      "data-player",
+      "Tom"
+    );
+  });
+
+  test("kurz Halten sperrt nicht", async ({ page }) => {
+    await fake.set({ knownPlayers: [{ name: "Tom", xuid: "3000" }] });
+    await page.goto("/spieler");
+
+    await page.getByText("Schon mal da gewesen (1)").click();
+    await page.getByTestId("players-seen").getByTestId("player-row").click();
+    await page.getByTestId("player-ban").click();
+    await page.getByTestId("player-ban-confirm").hover();
+    await page.mouse.down();
+    await page.waitForTimeout(800);
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+
+    expect((await fake.get()).bans).toEqual([]);
+    await expect(page.getByTestId("player-ban-confirm")).toBeVisible();
+  });
+
+  test("Gesperrt zeigt Grund und Datum, Entsperren setzt nicht auf die Whitelist", async ({ page }) => {
+    await fake.set({
+      knownPlayers: [{ name: "Tom", xuid: "3000" }],
+      bans: [{ player_name: "Tom", xuid: "3000", reason: "Gemein", banned_at: "2026-10-20T12:00:00" }]
+    });
+    await page.goto("/spieler");
+
+    const row = page.getByTestId("players-banned").getByTestId("player-row");
+    await expect(row).toContainText("Gemein · seit 20.10.2026");
+    await expect(page.getByTestId("players-seen")).toHaveCount(0);
+
+    await row.click();
+    await expect(page.getByTestId("player-banned")).toContainText("Grund: Gemein · seit 20.10.2026");
+    await expect(page.getByTestId("player-whitelist")).toHaveCount(0);
+    await expect(page.getByTestId("player-ban")).toHaveCount(0);
+
+    await page.getByTestId("player-unban").click();
+    await expect(toast(page, "Tom ist entsperrt.")).toBeVisible();
+    await expect(page.getByTestId("player-whitelist")).not.toBeChecked();
+    await expect(page.getByTestId("player-ban")).toBeEnabled();
+    await expect(page.getByTestId("players-banned")).toHaveCount(0);
+    const state = await fake.get();
+    expect(state.bans).toEqual([]);
+    expect(state.allowlist).toEqual([]);
+  });
+
+  test("ohne XUID ist Sperren ausgegraut und erklärt", async ({ page }) => {
+    await fake.set({ allowlist: [whitelistEntry("Ben")] });
+    await page.goto("/spieler");
+
+    await page.getByTestId("players-whitelist").getByTestId("player-row").click();
+
+    await expect(page.getByTestId("player-ban")).toBeDisabled();
+    await expect(page.getByTestId("player-ban-hint")).toHaveText(
+      "Erst möglich, wenn der Spieler einmal da war."
+    );
+  });
 });

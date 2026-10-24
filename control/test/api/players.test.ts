@@ -25,10 +25,10 @@ describe("GET /api/players", () => {
     expect(res.status).toBe(200);
     expect(res.body.players).toEqual([
       // Schreibweise aus dem Spiel, XUID aus den Logs
-      { name: "Anna", xuid: "3000", online: true, whitelisted: false },
+      { name: "Anna", xuid: "3000", online: true, whitelisted: false, banned: null },
       // Nur auf der Whitelist, noch nie da gewesen
-      { name: "Ben", xuid: null, online: false, whitelisted: true },
-      { name: "Tom", xuid: "2000", online: false, whitelisted: true }
+      { name: "Ben", xuid: null, online: false, whitelisted: true, banned: null },
+      { name: "Tom", xuid: "2000", online: false, whitelisted: true, banned: null }
     ]);
   });
 
@@ -37,7 +37,9 @@ describe("GET /api/players", () => {
 
     const res = await h.request("/api/players");
 
-    expect(res.body.players).toEqual([{ name: "Neu", xuid: "1000", online: true, whitelisted: false }]);
+    expect(res.body.players).toEqual([
+      { name: "Neu", xuid: "1000", online: true, whitelisted: false, banned: null }
+    ]);
   });
 
   it("meldet standardmäßig offenen Zugang, Mitglieder und keinen Offline-Modus", async () => {
@@ -62,6 +64,45 @@ describe("GET /api/players", () => {
     const res = await h.request("/api/players");
 
     expect(res.body.newPlayers).toBe("member");
+  });
+});
+
+describe("GET /api/players mit Sperren", () => {
+  it("meldet Sperren mit Grund und Zeitpunkt, auch für Spieler, die BSM sonst nicht mehr kennt", async () => {
+    h.fake.state.knownPlayers = [
+      { name: "Tom", xuid: "2000" },
+      { name: "Lena", xuid: "3000" }
+    ];
+    h.fake.state.bans = [
+      // Zuordnung über die XUID, nicht über den Namen
+      {
+        player_name: "Tommy",
+        xuid: "2000",
+        reason: "Hat alles angezündet",
+        banned_at: "2026-10-24T12:00:00"
+      },
+      { player_name: "Griefer", xuid: "4000", reason: null, banned_at: null }
+    ];
+
+    const res = await h.request("/api/players");
+
+    expect(res.body.players).toEqual([
+      {
+        name: "Griefer",
+        xuid: "4000",
+        online: false,
+        whitelisted: false,
+        banned: { reason: null, since: null }
+      },
+      { name: "Lena", xuid: "3000", online: false, whitelisted: false, banned: null },
+      {
+        name: "Tom",
+        xuid: "2000",
+        online: false,
+        whitelisted: false,
+        banned: { reason: "Hat alles angezündet", since: "2026-10-24T12:00:00" }
+      }
+    ]);
   });
 });
 
@@ -281,5 +322,133 @@ describe("POST /api/players/kick", () => {
 
     expect(res.status).toBe(200);
     expect(h.fake.commands()).toEqual([`kick "Lena" ${reason}`]);
+  });
+});
+
+describe("POST /api/players/ban", () => {
+  it("sperrt einen Online-Spieler mit Grund, nimmt ihn von der Whitelist und kickt ihn sofort", async () => {
+    h.fake.state.players = ["Lena", "Tom"];
+    h.fake.state.knownPlayers = [
+      { name: "Lena", xuid: "2000" },
+      { name: "Tom", xuid: "3000" }
+    ];
+    h.fake.state.allowlist = [whitelistEntry("lena"), whitelistEntry("Tom")];
+
+    const res = await h.request("/api/players/ban", {
+      method: "POST",
+      body: { xuid: "2000", reason: " Hat alles angezündet " }
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true });
+    expect(h.fake.state.bans).toEqual([
+      { player_name: "Lena", xuid: "2000", reason: "Hat alles angezündet", banned_at: expect.any(String) }
+    ]);
+    expect(h.fake.state.allowlist).toEqual([whitelistEntry("Tom")]);
+    expect(h.fake.commands()).toEqual(["allowlist reload", 'kick "Lena" Hat alles angezündet']);
+    expect(h.fake.state.players).toEqual(["Tom"]);
+  });
+
+  it.each([{}, { reason: "" }])("sperrt ohne Grund und kickt mit Standardnachricht (%j)", async (extra) => {
+    h.fake.state.players = ["Lena"];
+
+    const res = await h.request("/api/players/ban", { method: "POST", body: { xuid: "1000", ...extra } });
+
+    expect(res.status).toBe(200);
+    expect(h.fake.state.bans).toEqual([
+      { player_name: "Lena", xuid: "1000", reason: null, banned_at: expect.any(String) }
+    ]);
+    expect(h.fake.commands()).toEqual(['kick "Lena" Du bist gesperrt.']);
+    expect(h.fake.state.players).toEqual([]);
+  });
+
+  it("sperrt einen Spieler, der nicht online und nicht auf der Whitelist ist, ohne Befehl", async () => {
+    h.fake.state.status = "STOPPED";
+    h.fake.state.knownPlayers = [{ name: "Tom", xuid: "3000" }];
+
+    const res = await h.request("/api/players/ban", { method: "POST", body: { xuid: "3000" } });
+
+    expect(res.status).toBe(200);
+    expect(h.fake.state.bans).toEqual([
+      { player_name: "Tom", xuid: "3000", reason: null, banned_at: expect.any(String) }
+    ]);
+    expect(h.fake.commands()).toEqual([]);
+  });
+
+  it("nimmt bei gestopptem Server nur von der Whitelist, ohne reload", async () => {
+    h.fake.state.status = "STOPPED";
+    h.fake.state.knownPlayers = [{ name: "Tom", xuid: "3000" }];
+    h.fake.state.allowlist = [whitelistEntry("Tom")];
+
+    const res = await h.request("/api/players/ban", { method: "POST", body: { xuid: "3000" } });
+
+    expect(res.status).toBe(200);
+    expect(h.fake.state.allowlist).toEqual([]);
+    expect(h.fake.commands()).toEqual([]);
+  });
+
+  it("antwortet 404 bei unbekannter XUID und sperrt niemanden", async () => {
+    h.fake.state.knownPlayers = [{ name: "Tom", xuid: "3000" }];
+
+    const res = await h.request("/api/players/ban", { method: "POST", body: { xuid: "9999" } });
+
+    expect(res.status).toBe(404);
+    expect(h.fake.state.bans).toEqual([]);
+    expect(h.fake.commands()).toEqual([]);
+  });
+
+  it.each([
+    { xuid: "2000", reason: 'Sag "Tschüss"' },
+    { xuid: "2000", reason: "Tschüss\nop Lena" },
+    { xuid: "2000", reason: "x".repeat(81) },
+    { xuid: "2000", reason: 42 },
+    { xuid: "20x0" },
+    { xuid: "1".repeat(21) },
+    { xuid: 2000 },
+    { reason: "Tschüss" }
+  ])("lehnt %j ab und sperrt niemanden", async (body) => {
+    h.fake.state.players = ["Lena"];
+    h.fake.state.knownPlayers = [{ name: "Lena", xuid: "2000" }];
+
+    const res = await h.request("/api/players/ban", { method: "POST", body });
+
+    expect(res.status).toBe(400);
+    expect(h.fake.state.bans).toEqual([]);
+    expect(h.fake.commands()).toEqual([]);
+    expect(h.fake.state.players).toEqual(["Lena"]);
+  });
+});
+
+describe("DELETE /api/players/ban", () => {
+  it("entsperrt einen Spieler, ohne ihn wieder auf die Whitelist zu setzen", async () => {
+    h.fake.state.knownPlayers = [{ name: "Tom", xuid: "3000" }];
+    h.fake.state.bans = [
+      { player_name: "Tom", xuid: "3000", reason: "Gemein", banned_at: "2026-10-24T12:00:00" },
+      { player_name: "Lena", xuid: "2000", reason: null, banned_at: null }
+    ];
+
+    const res = await h.request("/api/players/ban", { method: "DELETE", body: { xuid: "3000" } });
+
+    expect(res.status).toBe(200);
+    expect(h.fake.state.bans).toEqual([{ player_name: "Lena", xuid: "2000", reason: null, banned_at: null }]);
+    expect(h.fake.state.allowlist).toEqual([]);
+    expect(h.fake.commands()).toEqual([]);
+    const players = await h.request("/api/players");
+    expect(players.body.players).toContainEqual({
+      name: "Tom",
+      xuid: "3000",
+      online: false,
+      whitelisted: false,
+      banned: null
+    });
+  });
+
+  it.each([{}, { xuid: "abc" }, { xuid: "" }])("lehnt %j ab", async (body) => {
+    h.fake.state.bans = [{ player_name: "Tom", xuid: "3000", reason: null, banned_at: null }];
+
+    const res = await h.request("/api/players/ban", { method: "DELETE", body });
+
+    expect(res.status).toBe(400);
+    expect(h.fake.state.bans).toHaveLength(1);
   });
 });

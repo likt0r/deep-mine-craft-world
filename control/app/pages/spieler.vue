@@ -13,8 +13,10 @@ const players = computed(() => {
   return needle ? all.filter((p) => p.name.toLowerCase().includes(needle)) : all;
 });
 const online = computed(() => players.value.filter((p) => p.online));
-const whitelisted = computed(() => players.value.filter((p) => !p.online && p.whitelisted));
-const seen = computed(() => players.value.filter((p) => !p.online && !p.whitelisted));
+// Gesperrte stehen nur unter Gesperrt, außer sie sind noch online, bis der Kick greift.
+const whitelisted = computed(() => players.value.filter((p) => !p.online && !p.banned && p.whitelisted));
+const banned = computed(() => players.value.filter((p) => !p.online && p.banned));
+const seen = computed(() => players.value.filter((p) => !p.online && !p.banned && !p.whitelisted));
 
 const feedback = useFeedback();
 const closed = computed(() => data.value?.closed ?? false);
@@ -238,6 +240,18 @@ watch([data, selected], () => {
       <ul v-else class="flex flex-col gap-2">
         <PlayerRow
           v-for="player in whitelisted"
+          :key="player.name"
+          :player="player"
+          @open="selected = player.name"
+        />
+      </ul>
+    </section>
+
+    <section v-if="banned.length > 0" class="flex flex-col gap-2.5" data-testid="players-banned">
+      <h2 class="font-pixel text-xl font-semibold text-highlighted">Gesperrt</h2>
+      <ul class="flex flex-col gap-2">
+        <PlayerRow
+          v-for="player in banned"
           :key="player.name"
           :player="player"
           @open="selected = player.name"
