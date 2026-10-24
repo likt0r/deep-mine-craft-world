@@ -5,7 +5,7 @@ export type UpdateKind = "minecraft" | "control";
 export interface VersionInfo {
   /** Installierte Version, `null`: unbekannt (z. B. BSM antwortet nicht) */
   current: string | null;
-  /** Neueste Version, `null`: noch nicht geprüft oder die Prüfung ist gescheitert */
+  /** Neueste Version, `null`: noch nie geprüft oder die Prüfung ist gescheitert */
   latest: string | null;
   /** Die neueste Version ist neuer als die installierte. */
   available: boolean;

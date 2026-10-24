@@ -3,7 +3,7 @@ useSeoMeta({ title: "Updates · Deep Mine Control" });
 
 const { status, connection, refresh: refreshStatus } = useServerStatus();
 const feedback = useFeedback();
-const { data: info, refresh } = useFetch<UpdatesInfo>("/api/updates", { key: "updates" });
+const { info, refresh } = useUpdates();
 
 // Die Werte laden alle 5 s neu, solange die Seite sichtbar ist. Geprüft wird dabei höchstens stündlich.
 useWhileVisible(refresh, 5000, { immediate: false });

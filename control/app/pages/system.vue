@@ -1,6 +1,8 @@
 <script setup lang="ts">
 useSeoMeta({ title: "System · Deep Mine Control" });
 
+const { available } = useUpdates();
+
 const TABS = [
   { to: "/system", label: "Übersicht", icon: "i-lucide-activity", testid: "system-tab-overview" },
   { to: "/system/netzwerk", label: "Netzwerk", icon: "i-lucide-network", testid: "system-tab-netzwerk" },
@@ -23,10 +25,15 @@ const TABS = [
         :key="tab.to"
         :to="tab.to"
         :data-testid="tab.testid"
-        class="block-btn flex h-12 items-center justify-center gap-1.5 rounded-lg px-1 text-sm sm:gap-2 sm:text-base border-2 border-accented bg-elevated font-semibold text-default aria-[current=page]:border-primary aria-[current=page]:bg-primary aria-[current=page]:text-inverted"
+        class="block-btn relative flex h-12 items-center justify-center gap-1.5 rounded-lg px-1 text-sm sm:gap-2 sm:text-base border-2 border-accented bg-elevated font-semibold text-default aria-[current=page]:border-primary aria-[current=page]:bg-primary aria-[current=page]:text-inverted"
       >
         <UIcon :name="tab.icon" class="size-5" />
         {{ tab.label }}
+        <span
+          v-if="tab.to === '/system/updates' && available.length > 0"
+          class="absolute -right-1 -top-1 size-2 rounded-full bg-warning ring-2 ring-default"
+          data-testid="system-tab-updates-dot"
+        />
       </NuxtLink>
     </nav>
     <NuxtPage />

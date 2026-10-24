@@ -4,6 +4,7 @@ const { status, locked } = useServerStatus();
 
 <template>
   <UContainer class="flex flex-col gap-6 py-5">
+    <UpdateHints />
     <ActiveWorldCard />
 
     <!-- Die Steuerung ist gesperrt, solange der Server nicht läuft oder eine Welt gewechselt wird. -->
