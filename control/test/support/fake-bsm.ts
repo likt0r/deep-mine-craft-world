@@ -438,6 +438,9 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
       case "POST send_command": {
         const command = (body as { command?: string } | null)?.command;
         if (!command) return bsmError(res, 422, "validation_error", "API data failed validation.");
+        // Wie BSM 4.0.1 (API_COMMAND_BLACKLIST): Diese Befehle lehnt send_command ab.
+        if (["stop", "save", "allowlist off"].some((blocked) => command.toLowerCase().startsWith(blocked)))
+          return bsmError(res, 403, "forbidden", "Command is blocked.");
         if (fake.state.status !== "RUNNING")
           return bsmError(res, 409, "server_not_running", "Server is not running");
         if (command === "gamerule" && fake.state.gamerules) {

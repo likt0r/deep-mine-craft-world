@@ -162,11 +162,20 @@ test("Zugang schließen und wieder öffnen", async ({ page }) => {
   expect((await fake.get()).properties["allow-list"]).toBe("true");
   expect(await fake.commands()).toEqual(["allowlist on"]);
 
+  // Öffnen startet neu, weil BSM `allowlist off` sperrt. Abbrechen lässt alles, wie es ist.
   await open.click();
-  await expect(toast(page, "Zugang ist offen.")).toBeVisible();
+  await page.getByTestId("access-open-cancel").click();
+  await expect(closed).toHaveAttribute("aria-pressed", "true");
+  expect((await fake.get()).properties["allow-list"]).toBe("true");
+
+  await open.click();
+  await page.getByTestId("access-open-confirm").click();
+  await expect(toast(page, "Zugang ist offen. Minecraft startet neu …")).toBeVisible();
   await expect(open).toHaveAttribute("aria-pressed", "true");
-  expect((await fake.get()).properties["allow-list"]).toBe("false");
-  expect(await fake.commands()).toEqual(["allowlist on", "allowlist off"]);
+  const state = await fake.get();
+  expect(state.properties["allow-list"]).toBe("false");
+  expect(state.calls.some((c) => c.path.endsWith("/restart"))).toBe(true);
+  expect(await fake.commands()).toEqual(["allowlist on"]);
 });
 
 test("beim Schließen mit Online-Spieler ohne Whitelist fragt ein Dialog", async ({ page }) => {

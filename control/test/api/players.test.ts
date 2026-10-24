@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { startHarness, type ControlHarness } from "../support/app";
 
@@ -115,7 +115,7 @@ describe("PUT /api/players/access", () => {
     const res = await h.request("/api/players/access", { method: "PUT", body: { closed: true } });
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ ok: true });
+    expect(res.body).toEqual({ ok: true, restarting: false });
     expect(h.fake.state.properties["allow-list"]).toBe("true");
     expect(h.fake.commands()).toEqual([]);
   });
@@ -128,14 +128,31 @@ describe("PUT /api/players/access", () => {
     expect(h.fake.commands()).toEqual(["allowlist on"]);
   });
 
-  it("öffnet den Zugang am laufenden Server mit allowlist off", async () => {
+  it("öffnet den Zugang am laufenden Server mit Neustart, weil BSM `allowlist off` sperrt", async () => {
     h.fake.state.properties["allow-list"] = "true";
 
     const res = await h.request("/api/players/access", { method: "PUT", body: { closed: false } });
 
     expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true, restarting: true });
     expect(h.fake.state.properties["allow-list"]).toBe("false");
-    expect(h.fake.commands()).toEqual(["allowlist off"]);
+    expect(h.fake.commands()).toEqual([]);
+    // Bis der Neustart durch ist, sonst setzt er den Status des nächsten Tests zurück auf RUNNING.
+    await vi.waitFor(() => {
+      expect(h.fake.calls.some((c) => c.path.endsWith("/restart"))).toBe(true);
+      expect(h.fake.state.status).toBe("RUNNING");
+    });
+  });
+
+  it("öffnet den Zugang bei gestopptem Server ohne Neustart", async () => {
+    h.fake.state.status = "STOPPED";
+    h.fake.state.properties["allow-list"] = "true";
+
+    const res = await h.request("/api/players/access", { method: "PUT", body: { closed: false } });
+
+    expect(res.body).toEqual({ ok: true, restarting: false });
+    expect(h.fake.state.properties["allow-list"]).toBe("false");
+    expect(h.fake.calls.some((c) => c.path.endsWith("/restart"))).toBe(false);
   });
 
   it.each(["visitor", "member"] as const)("setzt neue Spieler auf %s", async (newPlayers) => {
