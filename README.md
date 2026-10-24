@@ -138,6 +138,10 @@ Minecraft über BSM (stoppen, sichern, installieren, starten), Deep Mine Control
 `deep-mine-update` (Paket laden, prüfen, installieren, bei Bedarf zurück zur vorigen Version). Das startet nur die
 Oberfläche neu, niemand wird aus dem Spiel getrennt.
 
+Selbst aktualisieren kann sich Deep Mine Control ab v1.1.0. Ältere Stände kommen einmal von Hand auf diese Version
+(siehe „Aktualisieren“). Den Verlauf eines Updates zeigt `/var/lib/bsm/deep-mine-control/update.log`, den Stand
+`update-state.json` daneben. Für den Rückfall liegen das aktuelle und das vorige Paket in `/var/cache/deep-mine-control`.
+
 **Autoupdate** (je Karte ein Schalter, Standard aus, `update-settings.json`): Der Timer `deep-mine-update-check`
 ruft stündlich (erstmals 10 Minuten nach dem Start) `POST /api/updates/auto` auf. Installiert wird nur, wenn
 niemand spielt und weder ein Weltvorgang noch ein Update läuft. Ein Lauf startet höchstens ein Update, Minecraft
