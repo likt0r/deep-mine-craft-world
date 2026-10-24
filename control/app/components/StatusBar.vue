@@ -19,7 +19,31 @@ interface View {
   startLink?: boolean;
 }
 
+// Bei einem Update von Deep Mine Control startet die App neu. Die kurze Funkstille danach ist kein
+// Verbindungsproblem. Höchstens 2 Minuten, sonst ist wirklich etwas weg.
+const RESTART_GRACE_MS = 120_000;
+const restarting = ref(false);
+let graceTimer: ReturnType<typeof setTimeout> | undefined;
+watch(
+  [connection, () => status.value?.updating],
+  ([current, updating]) => {
+    clearTimeout(graceTimer);
+    if (current === "ok") restarting.value = updating === "control";
+    else if (restarting.value) graceTimer = setTimeout(() => (restarting.value = false), RESTART_GRACE_MS);
+  },
+  { immediate: true }
+);
+onBeforeUnmount(() => clearTimeout(graceTimer));
+
 const view = computed<View>(() => {
+  if (connection.value === "offline" && restarting.value)
+    return {
+      state: "updating",
+      text: "Deep Mine Control startet neu …",
+      icon: "i-lucide-loader-circle",
+      tone: "warning",
+      spin: true
+    };
   if (connection.value === "offline")
     return {
       state: "offline",
