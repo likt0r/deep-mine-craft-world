@@ -1,0 +1,85 @@
+# Paket deep-mine-control, gebaut von packaging/build-deb.sh (aus dem Repo-Wurzelordner, Pfade relativ dazu).
+# Alles liegt unter /usr und wird bei jedem Update ersetzt, deshalb keine conffiles. Wer lokal etwas ändern will,
+# legt eine gleichnamige Datei unter /etc ab (systemd, NetworkManager, networkd, modprobe und polkit lesen sie vorrangig).
+name: deep-mine-control
+arch: amd64
+platform: linux
+version: ${VERSION}
+version_schema: none
+section: games
+priority: optional
+maintainer: Benjamin Werner <likt0r@users.noreply.github.com>
+description: |-
+  Deep Mine Control mit BSM für den Minecraft-Server der Familie
+  Tablet-Oberfläche ohne Anmeldung (Port 80), BSM per https (Port 443, Caddy),
+  systemd-Units, root-Helfer und Netzwerk-Einstellungen.
+homepage: https://github.com/likt0r/deep-mine-craft-world
+
+depends:
+  - nodejs (>= 22)
+  - caddy
+  - python3
+  - python3-venv
+  - curl
+  - smartmontools
+  - network-manager
+  - dnsmasq-base
+  - iw
+
+contents:
+  # Fertig gebaute App mit version.json (build/deb/app legt build-deb.sh an)
+  - src: build/deb/app
+    dst: /usr/lib/deep-mine-control/app
+    type: tree
+
+  # root-Helfer
+  - src: server/ethernet.py
+    dst: /usr/lib/deep-mine-control/bin/deep-mine-ethernet
+    file_info: { mode: 0755 }
+  - src: server/wifi-check.sh
+    dst: /usr/lib/deep-mine-control/bin/deep-mine-wifi-check
+    file_info: { mode: 0755 }
+  - src: server/smart-status.sh
+    dst: /usr/lib/deep-mine-control/bin/deep-mine-smart-status
+    file_info: { mode: 0755 }
+
+  # systemd-Units
+  - src: server/bsm.service
+    dst: /usr/lib/systemd/system/bsm.service
+  - src: server/deep-mine-control.service
+    dst: /usr/lib/systemd/system/deep-mine-control.service
+  - src: server/deep-mine-backup-on-shutdown.service
+    dst: /usr/lib/systemd/system/deep-mine-backup-on-shutdown.service
+  - src: server/deep-mine-ethernet.path
+    dst: /usr/lib/systemd/system/deep-mine-ethernet.path
+  - src: server/deep-mine-ethernet.service
+    dst: /usr/lib/systemd/system/deep-mine-ethernet.service
+  - src: server/deep-mine-smart.service
+    dst: /usr/lib/systemd/system/deep-mine-smart.service
+  - src: server/deep-mine-smart.timer
+    dst: /usr/lib/systemd/system/deep-mine-smart.timer
+  - src: server/deep-mine-wifi-check.service
+    dst: /usr/lib/systemd/system/deep-mine-wifi-check.service
+  - src: server/deep-mine-wifi-check.timer
+    dst: /usr/lib/systemd/system/deep-mine-wifi-check.timer
+
+  # Caddy: eigene Caddyfile, caddy.service liest sie über ein Drop-in
+  - src: server/Caddyfile
+    dst: /usr/lib/deep-mine-control/Caddyfile
+  - src: server/caddy-deep-mine-control.conf
+    dst: /usr/lib/systemd/system/caddy.service.d/deep-mine-control.conf
+
+  # Rechte (polkit) und Netzwerk
+  - src: server/50-deep-mine-control.rules
+    dst: /usr/share/polkit-1/rules.d/50-deep-mine-control.rules
+  - src: server/networkmanager-deep-mine.conf
+    dst: /usr/lib/NetworkManager/conf.d/90-deep-mine.conf
+  - src: server/10-wlan-unmanaged.network
+    dst: /usr/lib/systemd/network/10-wlan-unmanaged.network
+  - src: server/wlan-regdom.conf
+    dst: /usr/lib/modprobe.d/deep-mine-wlan.conf
+
+scripts:
+  postinstall: packaging/postinst
+  preremove: packaging/prerm
+  postremove: packaging/postrm

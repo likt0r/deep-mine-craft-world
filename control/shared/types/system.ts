@@ -12,7 +12,7 @@ export interface SystemInfo {
   memory: { totalBytes: number; availableBytes: number } | null;
   /** Dateisystem mit dem Server-Ordner */
   disk: { totalBytes: number; availableBytes: number } | null;
-  /** SMART-Werte der Systemplatte, geschrieben vom Timer aus install.sh */
+  /** SMART-Werte der Systemplatte, geschrieben vom Timer deep-mine-smart (Paket) */
   ssd: { model: string | null; healthy: boolean; wearPercent: number | null } | null;
   uptime: { systemSeconds: number | null; minecraftSeconds: number | null };
   minecraft: { version: string | null };

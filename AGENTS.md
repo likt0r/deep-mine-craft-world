@@ -21,6 +21,7 @@ Die App liegt in `control/` (Nuxt 4, Nuxt UI 4). Begriffe stehen in `CONTEXT.md`
 - `npm test`: baut die App und führt die API-Tests aus (Vitest, `test/api/`)
 - `npm run test:e2e`: baut die App und führt die Seitentests aus (Playwright, `test/e2e/`, Handy und Tablet)
 - `npm run lint`, `npm run typecheck`
+- Paket: `packaging/build-deb.sh [--no-build] X.Y.Z` und `packaging/check-deb.sh dist/….deb` (aus dem Repo-Wurzelordner). Neue Dateien für den Server kommen nach `server/` und in `packaging/nfpm.yaml`; Einrichtungsschritte in `packaging/postinst` (idempotent).
 
 Jeder PR und jeder Push auf `main` läuft durch die CI-Pipeline (Job `check`): Lint, Typecheck, API-Tests und Seitentests. Gemergt wird nur grün.
 

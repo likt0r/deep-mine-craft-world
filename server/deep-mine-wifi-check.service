@@ -5,4 +5,4 @@ Requires=NetworkManager.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/deep-mine-wifi-check
+ExecStart=/usr/lib/deep-mine-control/bin/deep-mine-wifi-check

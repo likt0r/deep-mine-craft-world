@@ -39,6 +39,7 @@ export async function startApp(fake: FakeBsm, fixture: ServerFixture, port?: num
       NUXT_PROC_DIR: fixture.procDir,
       NUXT_SYS_DIR: fixture.sysDir,
       NUXT_SMART_FILE: fixture.smartFile,
+      NUXT_VERSION_FILE: fixture.versionFile,
       // Statt den Rechner neu zu starten oder auszuschalten, nur eine Datei anlegen.
       NUXT_REBOOT_COMMAND: `/usr/bin/touch ${fixture.rebootMarker}`,
       NUXT_POWEROFF_COMMAND: `/usr/bin/touch ${fixture.poweroffMarker}`,

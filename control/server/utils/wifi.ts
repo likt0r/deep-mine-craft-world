@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 
 const run = promisify(execFile);
 
-/** Das eigene WLAN (AP) und die hinterlegten WLANs, wie install.sh und diese Datei sie anlegen. */
+/** Das eigene WLAN (AP) und die hinterlegten WLANs, wie das Paket (postinst) und diese Datei sie anlegen. */
 export const AP_PROFILE = "dmc-ap";
 const SAVED_PREFIX = "dmc-wlan-";
 /** Hinterlegte WLANs vor dem AP: NetworkManager nimmt beim Verbinden die höchste Priorität. */

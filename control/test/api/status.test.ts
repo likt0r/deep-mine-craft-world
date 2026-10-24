@@ -1,3 +1,5 @@
+import { rmSync } from "node:fs";
+
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { startHarness, type ControlHarness } from "../support/app";
@@ -22,8 +24,17 @@ describe("GET /api/status", () => {
       players: ["Lena", "Tom"],
       busy: false,
       switching: null,
-      updating: null
+      updating: null,
+      version: "1.2.3"
     });
+  });
+
+  it("meldet „dev“, wenn die Versionsdatei fehlt (ohne Paket)", async () => {
+    rmSync(h.fixture.versionFile);
+
+    const res = await h.request("/api/status");
+
+    expect(res.body.version).toBe("dev");
   });
 
   it("nennt den Ordnernamen, wenn die aktive Welt auf keinem Platz liegt", async () => {

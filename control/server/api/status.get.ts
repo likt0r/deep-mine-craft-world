@@ -3,7 +3,7 @@ export default defineEventHandler(async (): Promise<Status> => {
     // Deep Mine Control läuft, aber BSM antwortet nicht. Die Seite unterscheidet das von „keine Verbindung“.
     throw createError({ statusCode: 503, message: "BSM antwortet nicht", data: { reason: "bsm" }, cause });
   });
-  const places = await getPlaces(properties);
+  const [places, version] = await Promise.all([getPlaces(properties), readVersion()]);
   return {
     state: mapServerState(summary.status),
     // Anzeigename der aktiven Welt; liegt sie auf keinem Platz, der Ordnername.
@@ -11,6 +11,7 @@ export default defineEventHandler(async (): Promise<Status> => {
     players: summary.players.map((p) => p.name),
     busy: isWorldOperationRunning(),
     switching: currentWorldSwitch(),
-    updating: updatingNow()
+    updating: updatingNow(),
+    version
   };
 });

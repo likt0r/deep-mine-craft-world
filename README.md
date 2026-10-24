@@ -9,13 +9,14 @@ Die Kinder steuern das Spiel über **Deep Mine Control**, eine Tablet-Oberfläch
 
 | Was | Wo |
 |---|---|
-| Server | Ubuntu 26.04 auf `192.168.0.110` |
-| Deep Mine Control | http://192.168.0.110 (ohne Anmeldung, nur im LAN) |
-| BSM-Weboberfläche | https://192.168.0.110 (Caddy, selbst ausgestelltes Zertifikat) |
+| Server | Ubuntu 26.04, zuhause auf `192.168.0.110` |
+| Deep Mine Control | http://192.168.0.110 bzw. `http://<Adresse des Servers>` (ohne Anmeldung, nur im LAN) |
+| BSM-Weboberfläche | https://192.168.0.110 bzw. `https://<Adresse des Servers>` (Caddy, selbst ausgestelltes Zertifikat) |
+| Paket | `deep-mine-control` (.deb): App, Units, Helfer und Einstellungen unter `/usr/lib/deep-mine-control` und den `/usr/lib`-Ordnern von systemd, NetworkManager und modprobe; die Maintainer-Skripte richten BSM und Dienste ein |
 | BSM | Dienst `bsm`, Benutzer `bsm`, Programm in `/opt/bsm/.venv`, lauscht nur auf `127.0.0.1:11325` |
 | Daten | `/var/lib/bsm/config` (Datenbank, Konten), `/var/lib/bsm/data` (Server, Welten, Backups) |
 | Bedrock-Server | in BSM `Bedrock`, Ordner `/var/lib/bsm/data/servers/Bedrock` |
-| Deep Mine Control | Dienst `deep-mine-control`, Benutzer `bsm`, Programm in `/opt/deep-mine-control`, lauscht nur auf `127.0.0.1:3000`, Daten in `/var/lib/bsm/deep-mine-control`, Passwort in `/etc/deep-mine-control.env` |
+| Deep Mine Control | Dienst `deep-mine-control`, Benutzer `bsm`, Programm in `/usr/lib/deep-mine-control/app`, lauscht nur auf `127.0.0.1:3000`, Daten in `/var/lib/bsm/deep-mine-control`, Passwort in `/etc/deep-mine-control.env` |
 
 Passwörter stehen nicht in diesem Repo.
 
@@ -54,7 +55,7 @@ Die Tablet-Oberfläche unter http://192.168.0.110 hat vier Bereiche (Handy: Tabs
   und QR-Code, Offline-Modus
 
 Rechner neu starten und ausschalten darf Deep Mine Control (Benutzer `bsm`) über die polkit-Regel
-`/etc/polkit-1/rules.d/50-deep-mine-control.rules`, sonst nichts. Ausgeschaltet geht der Rechner nur am Gerät wieder an.
+`/usr/share/polkit-1/rules.d/50-deep-mine-control.rules`, sonst nichts. Ausgeschaltet geht der Rechner nur am Gerät wieder an.
 
 ## Backups
 
@@ -62,7 +63,7 @@ Liegen als `.mcworld` in `/var/lib/bsm/data/backups/Bedrock/`, Name `<Weltordner
 In Deep Mine Control (System → Backups): Liste je Welt, Jetzt sichern (nur die aktive Welt, so arbeitet BSM),
 Herunterladen, Zurückspielen (3 s halten). Die aktive Welt spielt BSM zurück (Server stoppt und startet); für
 andere Welten entpackt Deep Mine Control das Backup selbst in deren Ordner, denn **BSM spielt immer in die gerade
-aktive Welt zurück**. Damit Deep Mine Control `backup_on_start` schalten darf, gibt `install.sh` dem BSM-Konto
+aktive Welt zurück**. Damit Deep Mine Control `backup_on_start` schalten darf, gibt das Paket dem BSM-Konto
 `deep-mine-control` die Rolle admin.
 
 **Sichern, wenn eine Welt beendet wird** (Standard an, `backup-settings.json`): Deep Mine Control sichert die
@@ -75,14 +76,17 @@ seine Plugins still, bevor es die Server stoppt.
 
 Deep Mine Control (`bsm`) darf netplan nicht ändern. Es schreibt nur eine Anfrage
 (`/var/lib/bsm/deep-mine-control/ethernet-request.json`); die Path-Unit `deep-mine-ethernet.path` startet den
-root-Helfer `/usr/local/bin/deep-mine-ethernet` (`server/ethernet.py`). Der prüft die Werte noch einmal, schreibt
+root-Helfer `/usr/lib/deep-mine-control/bin/deep-mine-ethernet` (`server/ethernet.py`). Der prüft die Werte noch einmal, schreibt
 `/etc/netplan/60-deep-mine-ethernet.yaml` (feste IP; für DHCP wird die Datei gelöscht, dann gilt wieder
 `00-installer-config.yaml`), führt `netplan apply` aus und startet den Timer `deep-mine-ethernet-rollback`:
 **Ohne Bestätigung in der Oberfläche gilt nach 2 Minuten wieder die alte Einstellung.** Notfalls von Hand:
 `sudo rm /etc/netplan/60-deep-mine-ethernet.yaml && sudo netplan apply`.
 
 Caddy liefert Deep Mine Control unter jeder Adresse aus (`:80`), also auch im eigenen WLAN unter
-`http://10.42.0.1` und nach einem IP-Wechsel.
+`http://10.42.0.1` und nach einem IP-Wechsel. BSM gibt es ebenso unter jeder Adresse per https (`:443`): Das
+Zertifikat stellt Caddys interne CA beim ersten Aufruf einer Adresse aus („on demand“). Die Konfiguration liegt in
+`/usr/lib/deep-mine-control/Caddyfile`, `caddy.service` liest sie über ein Drop-in
+(`/usr/lib/systemd/system/caddy.service.d/deep-mine-control.conf`). `/etc/caddy/Caddyfile` wird nicht benutzt.
 
 ## VPN
 
@@ -104,7 +108,7 @@ nicht aus).
 ## WLAN
 
 NetworkManager verwaltet **nur das WLAN** (`wlp3s0`, Atheros AR9287, 2,4 GHz); Ethernet bleibt bei
-systemd-networkd/netplan (`/etc/NetworkManager/conf.d/90-deep-mine.conf`, `/etc/systemd/network/10-wlan-unmanaged.network`).
+systemd-networkd/netplan (`/usr/lib/NetworkManager/conf.d/90-deep-mine.conf`, `/usr/lib/systemd/network/10-wlan-unmanaged.network`).
 
 - Hinterlegte WLANs heißen in NetworkManager `dmc-wlan-N` (Priorität 10), das eigene WLAN `dmc-ap`
   (Standard `MINECRAFT-World` / `deep-mine-craft`, Priorität −100). Ohne hinterlegtes WLAN in Reichweite geht
@@ -118,7 +122,7 @@ systemd-networkd/netplan (`/etc/NetworkManager/conf.d/90-deep-mine.conf`, `/etc/
   `online-mode` aus. Ob Konsolen ganz ohne Internet beitreten können, hängt vom Gerät ab.
 
 Die SMART-Werte der Systemplatte braucht root: Der Timer `deep-mine-smart` schreibt sie alle 30 Minuten
-nach `/var/lib/bsm/deep-mine-control/smart.json` (`install.sh` richtet ihn ein).
+nach `/var/lib/bsm/deep-mine-control/smart.json` (das Paket richtet ihn ein).
 Begriffe stehen in [CONTEXT.md](CONTEXT.md), entwickelt wird in `control/` (siehe [AGENTS.md](AGENTS.md)).
 
 Deep Mine Control spricht mit BSM über ein eigenes BSM-Konto `deep-mine-control` (Rolle moderator reicht).
@@ -126,20 +130,47 @@ Das Passwort steht nur in `/etc/deep-mine-control.env` als `NUXT_BSM_PASSWORD=�
 Konto neu anlegen: in BSM unter Benutzer einen Registrierungslink erzeugen, damit `deep-mine-control`
 registrieren, Passwort in die Datei schreiben, `sudo systemctl restart deep-mine-control`.
 
-## Aktualisieren
+## Paket bauen
 
-Auf dem Laptop, nachdem die Änderungen auf GitHub sind:
+Deep Mine Control wird nicht mehr auf dem Server gebaut. Die Pipeline (`.github/workflows/package.yml`) baut bei jedem
+PR und auf main das Paket und prüft Dateiliste und Abhängigkeiten. Lokal (braucht `dpkg-deb`):
 
 ```sh
-./deploy.sh
+(cd control && npm ci)
+packaging/build-deb.sh 1.0.0          # baut die App; --no-build nimmt control/.output
+packaging/check-deb.sh dist/deep-mine-control_1.0.0_amd64.deb
 ```
 
-Das holt auf dem Server den neuen Stand (`~/deep-mine-craft-world`, `git pull`) und führt `install.sh` aus.
+`build-deb.sh` lädt [nfpm](https://nfpm.goreleaser.com) als festes Release (Version und SHA-256 im Skript) und
+schreibt `/usr/lib/deep-mine-control/app/version.json` (`{ version, commit }`); `GET /api/status` meldet daraus
+`version`. Die Maintainer-Skripte (`packaging/postinst`, `prerm`, `postrm`) richten bei jeder Installation BSM
+(feste Version 4.0.1), Benutzer, Passwortdatei (nur wenn sie fehlt), eigenes WLAN (nur wenn es fehlt), Admin-Rolle und Dienste ein.
+Beim Entfernen bleiben Welten, Backups, `/var/lib/bsm` und `/etc/deep-mine-control.env` immer liegen.
+
+## Aktualisieren
+
+Ausgerollt wird künftig über GitHub-Releases: Das Paket hängt mit `.deb.sha256` am Release, der Server lädt und
+installiert es (Release-Weg und Updates aus Deep Mine Control folgen mit #61). Es gibt bewusst kein apt-Repository
+(siehe [ADR 0002](docs/adr/0002-paket-in-der-pipeline-bauen-ohne-apt-repository.md)). Bis dahin von Hand:
+Paket aus dem Artefakt des Workflows „Paket“ laden (oder lokal bauen) und auf dem Server
+
+```sh
+sudo apt-get install ./deep-mine-control_X.Y.Z_amd64.deb
+```
+
+Die erste Installation auf einem Server, der noch mit dem alten `install.sh` eingerichtet wurde, räumt dessen
+Kopien ab (`/etc/systemd/system/bsm.service` und `deep-mine-*`, `/usr/local/bin/deep-mine-*`,
+`/opt/deep-mine-control`, die alten Dateien unter `/etc/polkit-1`, `/etc/NetworkManager`, `/etc/systemd/network`,
+`/etc/modprobe.d`). Die alte `/etc/caddy/Caddyfile` bleibt liegen, wird aber nicht mehr gelesen.
 
 ## Neu installieren (z. B. auf neuer Festplatte)
 
-1. Ubuntu Server installieren, dieses Repo nach `~/deep-mine-craft-world` klonen.
-2. `sudo ./install.sh 192.168.0.110`
+1. Ubuntu Server installieren.
+2. Neuestes Release installieren (lädt das Paket, prüft die SHA-256-Prüfsumme, installiert mit apt; geht, sobald
+   es das erste Release mit Paket gibt, siehe #61):
+   ```sh
+   curl -fsSLO https://raw.githubusercontent.com/likt0r/deep-mine-craft-world/main/install.sh && sudo bash install.sh
+   ```
 3. Daten vom alten Server übernehmen. Damit bleiben Welten, Backups und die BSM-Konten erhalten:
    ```sh
    # auf dem alten Server

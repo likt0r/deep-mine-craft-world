@@ -13,6 +13,8 @@ export interface Status {
   switching: WorldSwitch | null;
   /** Was gerade aktualisiert wird, sonst `null`. */
   updating: UpdateKind | null;
+  /** Version von Deep Mine Control aus der Versionsdatei des Pakets, ohne Paket „dev“. */
+  version: string;
 }
 
 /** Ein Weltwechsel: erst 10 s Countdown im Chat (wenn jemand spielt), dann sichern (wenn eingestellt), dann Neustart. */

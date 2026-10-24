@@ -1,7 +1,7 @@
 // Ausgangslage des Fake-nmcli (test/support/fake-nmcli.mjs), auch für Tests zum Vergleichen.
 const AP = "dmc-ap";
 
-/** Ausgangslage wie nach install.sh: kein hinterlegtes WLAN, eigenes WLAN aktiv. */
+/** Ausgangslage wie nach der Paketinstallation: kein hinterlegtes WLAN, eigenes WLAN aktiv. */
 export function initialState() {
   return {
     connections: [{ name: AP, ssid: "MINECRAFT-World", psk: "deep-mine-craft", mode: "ap" }],

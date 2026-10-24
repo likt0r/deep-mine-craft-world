@@ -1,0 +1,115 @@
+#!/bin/sh
+# Richtet BSM, Deep Mine Control, WLAN und Caddy ein. Läuft bei jeder Installation und jedem Update, mehrfach ausführbar.
+# Welten, Backups, BSM-Daten, das Passwort und die WLAN-/VPN-Profile bleiben, wie sie sind.
+set -e
+
+[ "$1" = configure ] || exit 0
+
+BSM_VERSION=4.0.1
+BSM_VENV=/opt/bsm/.venv
+BSM_DB=/var/lib/bsm/config/bedrock-server-manager.db
+UNITS="bsm.service deep-mine-control.service deep-mine-backup-on-shutdown.service deep-mine-ethernet.path
+deep-mine-ethernet.service deep-mine-smart.service deep-mine-smart.timer deep-mine-wifi-check.service
+deep-mine-wifi-check.timer"
+
+# systemd läuft (nicht in einem Container oder chroot)
+systemd_running() { [ -d /run/systemd/system ]; }
+as_bsm() { (cd /var/lib/bsm && runuser -u bsm -- env HOME=/var/lib/bsm "$@"); }
+
+# --- Übergang vom alten install.sh: dessen Kopien in /etc würden die Dateien des Pakets verdecken ---
+# Ausschalten ohne Stoppen (das Stoppen von deep-mine-backup-on-shutdown würde sichern); eingeschaltet wird unten neu.
+for unit in $UNITS; do
+  if [ -f "/etc/systemd/system/$unit" ]; then
+    systemctl disable --quiet "$unit" 2>/dev/null || true
+    rm -f "/etc/systemd/system/$unit"
+  fi
+done
+rm -f /etc/polkit-1/rules.d/50-deep-mine-control.rules \
+  /etc/NetworkManager/conf.d/90-deep-mine.conf \
+  /etc/systemd/network/10-wlan-unmanaged.network \
+  /etc/modprobe.d/deep-mine-wlan.conf
+if systemd_running; then systemctl daemon-reload; fi
+
+# --- WLAN, Teil 1 ---
+# NetworkManager verwaltet nur WLAN und VPN (/usr/lib/NetworkManager/conf.d/90-deep-mine.conf), networkd lässt das
+# WLAN los. Ubuntu lässt NetworkManager ohnehin nur WLAN und Mobilfunk verwalten: Startet er bei der Erstinstallation
+# vor diesem Skript, fasst er das Kabel (SSH) trotzdem nicht an.
+iw reg set DE || true
+if systemd_running; then networkctl reload || true; fi
+
+# --- BSM ---
+id bsm >/dev/null 2>&1 || useradd --system --shell /usr/sbin/nologin --home-dir /var/lib/bsm --create-home bsm
+install -d -o bsm -g bsm /opt/bsm /var/lib/bsm/config /var/lib/bsm/data /var/lib/bsm/deep-mine-control
+
+[ -x "$BSM_VENV/bin/python" ] || as_bsm python3 -m venv "$BSM_VENV"
+# Nur bei anderer Version installieren: Ein Update braucht so kein Internet für pip.
+installed=$(as_bsm "$BSM_VENV/bin/python" -c \
+  'import importlib.metadata as m; print(m.version("bedrock-server-manager"))' 2>/dev/null || true)
+if [ "$installed" != "$BSM_VERSION" ]; then
+  as_bsm "$BSM_VENV/bin/pip" install -q --upgrade pip
+  as_bsm "$BSM_VENV/bin/pip" install -q "bedrock-server-manager==$BSM_VERSION"
+fi
+
+# --- Deep Mine Control ---
+if [ ! -f /etc/deep-mine-control.env ]; then
+  install -m 600 /dev/null /etc/deep-mine-control.env
+  echo "NUXT_BSM_PASSWORD=" > /etc/deep-mine-control.env
+  echo "Hinweis: Passwort des BSM-Kontos deep-mine-control in /etc/deep-mine-control.env eintragen (siehe README)."
+fi
+
+# --- WLAN, Teil 2: eigenes WLAN (AP) als Rückfall ---
+if systemd_running; then
+  systemctl enable --now NetworkManager
+fi
+if nmcli -t general status >/dev/null 2>&1; then
+  # Konfiguration neu einlesen (90-deep-mine.conf ist eben erst gekommen oder hat sich geändert).
+  nmcli general reload conf || true
+  # Ein hochgeladenes VPN (Deep Mine Control) darf dem Kabel nie die Route ins Heimnetz nehmen.
+  if nmcli -t -f NAME connection show | grep -qx dmc-vpn; then
+    nmcli connection modify dmc-vpn ipv4.route-metric 1000 ipv6.route-metric 1000
+  fi
+  # Das Profil nur anlegen, wenn es fehlt: Name und Passwort aus Deep Mine Control bleiben erhalten.
+  if ! nmcli -t -f NAME connection show | grep -qx dmc-ap; then
+    nmcli connection add type wifi ifname wlp3s0 con-name dmc-ap ssid MINECRAFT-World \
+      802-11-wireless.mode ap 802-11-wireless.band bg ipv4.method shared \
+      wifi-sec.key-mgmt wpa-psk wifi-sec.psk deep-mine-craft \
+      connection.autoconnect yes connection.autoconnect-priority -100
+  fi
+  # Nur WPA2 (CCMP): sicherer als gemischt mit WPA1, und Konsolen kommen damit am besten klar.
+  nmcli connection modify dmc-ap wifi-sec.proto rsn wifi-sec.pairwise ccmp wifi-sec.group ccmp
+fi
+
+# Deep Mine Control schaltet „Vor jedem Start sichern“ (BSM-Plugin backup_on_start). Das darf nur ein BSM-Admin.
+# BSM hält die Benutzer im Speicher: Ändert sich die Rolle, muss BSM danach neu starten (stoppt Minecraft kurz).
+ROLE_CHANGED=0
+if [ -f "$BSM_DB" ]; then
+  ROLE_CHANGED=$(as_bsm "$BSM_VENV/bin/python" - "$BSM_DB" <<'PY'
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+changed = db.execute("update users set role = 'admin' where username = 'deep-mine-control' and role != 'admin'").rowcount
+db.commit()
+print(1 if changed else 0)
+PY
+)
+fi
+
+# --- Dienste ---
+systemctl enable --quiet bsm.service deep-mine-control.service deep-mine-smart.timer deep-mine-wifi-check.timer \
+  deep-mine-ethernet.path deep-mine-backup-on-shutdown.service
+if systemd_running; then
+  systemctl start bsm.service
+  if [ "$ROLE_CHANGED" = 1 ]; then systemctl restart bsm.service; fi
+  systemctl start deep-mine-smart.timer deep-mine-wifi-check.timer deep-mine-ethernet.path
+  # Nur starten (ExecStart tut nichts), nie neu starten: ein Stopp würde sonst schon jetzt sichern.
+  systemctl start deep-mine-backup-on-shutdown.service
+  systemctl start deep-mine-smart.service || echo "Hinweis: SMART-Werte konnten nicht gelesen werden."
+  systemctl restart deep-mine-control.service
+  # caddy.service liest über das Drop-in jetzt /usr/lib/deep-mine-control/Caddyfile.
+  systemctl restart caddy.service
+fi
+
+# --- Übergang, Teil 2: alte Helfer und App erst löschen, wenn die neuen laufen ---
+rm -f /usr/local/bin/deep-mine-ethernet /usr/local/bin/deep-mine-wifi-check /usr/local/bin/deep-mine-smart-status
+rm -rf /opt/deep-mine-control
+
+exit 0

@@ -43,7 +43,7 @@ function helperRun(command = "run", env: Record<string, string> = {}) {
       SYSTEMCTL: join(dir, "bin", "systemctl"),
       IP: fakeIp,
       FAKE_NMCLI_STATE: join(dir, "nm.json"),
-      SELF: "/usr/local/bin/deep-mine-ethernet",
+      SELF: "/usr/lib/deep-mine-control/bin/deep-mine-ethernet",
       ...env
     },
     encoding: "utf8"
@@ -90,7 +90,7 @@ describe("feste IP", () => {
     expect(log()).toEqual([
       "netplan generate",
       "systemctl stop deep-mine-ethernet-rollback.timer",
-      "systemd-run --unit=deep-mine-ethernet-rollback --on-active=120 /usr/local/bin/deep-mine-ethernet rollback",
+      "systemd-run --unit=deep-mine-ethernet-rollback --on-active=120 /usr/lib/deep-mine-control/bin/deep-mine-ethernet rollback",
       "netplan apply"
     ]);
     expect(state()).toMatchObject({
