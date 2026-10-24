@@ -132,5 +132,16 @@ export const bsm = {
   unban: (xuid: string) => bsmFetch(serverPath("bans/remove"), { method: "DELETE", body: { xuid } }),
   /** Alle Spieler, die BSM je in den Server-Logs gesehen hat, mit XUID. */
   knownPlayers: () =>
-    bsmFetch<{ players: { name: string; xuid: string }[] }>("/api/players/get").then((r) => r.players)
+    bsmFetch<{ players: { name: string; xuid: string }[] }>("/api/players/get").then((r) => r.players),
+  /** Rechte aus permissions.json. */
+  permissions: () =>
+    bsmFetch<{
+      permissions: { xuid: string; name: string; permission_level: Permission }[];
+    }>(serverPath("permissions/get")).then((r) => r.permissions),
+  /** Setzt den Eintrag dieser XUID in permissions.json. Der laufende Server liest sie erst nach `permission reload`. */
+  setPermission: (xuid: string, name: string, level: Permission) =>
+    bsmFetch(serverPath("permissions/set"), {
+      method: "POST",
+      body: { permissions: [{ xuid, name, permission_level: level }] }
+    })
 };

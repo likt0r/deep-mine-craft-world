@@ -10,7 +10,7 @@ const feedback = useFeedback();
 const setWhitelisted = useWhitelist();
 
 /** Was im Sheet gerade zu sehen ist. */
-const view = ref<"menu" | "kick" | "ban">("menu");
+const view = ref<"menu" | "kick" | "ban" | "operator">("menu");
 const busy = ref(false);
 const reason = ref("");
 const reasonValid = computed(() => isValidPlayerMessage(reason.value));
@@ -18,7 +18,8 @@ const reasonValid = computed(() => isValidPlayerMessage(reason.value));
 const open = computed({
   get: () => props.player !== null,
   set: (value: boolean) => {
-    if (!value) emit("close");
+    // Der Drawer meldet „zu“ auch, wenn er beim Laden der Seite noch gar nicht offen war.
+    if (!value && props.player) emit("close");
   }
 });
 
@@ -38,6 +39,39 @@ watch(
     if (!online && view.value === "kick") view.value = "menu";
   }
 );
+
+const hasXuid = computed(() => !!props.player?.xuid);
+
+const PERMISSIONS: { value: Permission; label: string; text: string }[] = [
+  { value: "visitor", label: "Besucher", text: "Kann nur zuschauen, nichts abbauen oder bauen." },
+  { value: "member", label: "Mitglied", text: "Spielt ganz normal." },
+  { value: "operator", label: "Operator", text: "Darf Befehle nutzen und Einstellungen ändern." }
+];
+const permissionText = computed(() => PERMISSIONS.find((p) => p.value === props.player?.permission)?.text);
+
+async function setPermission(permission: Permission) {
+  if (!props.player?.xuid) return;
+  busy.value = true;
+  try {
+    await $fetch("/api/players/permission", { method: "PUT", body: { xuid: props.player.xuid, permission } });
+    await refreshNuxtData("players");
+    feedback.done(
+      `${props.player.name} ist jetzt ${PERMISSIONS.find((p) => p.value === permission)?.label}.`
+    );
+    view.value = "menu";
+  } catch {
+    feedback.failed();
+  } finally {
+    busy.value = false;
+  }
+}
+
+/** Operator darf Befehle nutzen, deshalb erst nach Halten. */
+function choosePermission(permission: Permission) {
+  if (permission === props.player?.permission) return;
+  if (permission === "operator") view.value = "operator";
+  else void setPermission(permission);
+}
 
 async function toggleWhitelist(on: boolean) {
   if (!props.player) return;
@@ -173,6 +207,32 @@ async function unban() {
               data-testid="player-whitelist"
               @update:modelValue="toggleWhitelist"
             />
+          </div>
+
+          <div
+            class="flex flex-col gap-2 rounded-xl border border-default bg-default p-3.5"
+            data-testid="player-permission"
+          >
+            <span class="font-semibold">Recht</span>
+            <div class="grid grid-cols-3 gap-2">
+              <UButton
+                v-for="option in PERMISSIONS"
+                :key="option.value"
+                :color="player.permission === option.value ? 'primary' : 'neutral'"
+                :variant="player.permission === option.value ? 'solid' : 'subtle'"
+                :aria-pressed="player.permission === option.value"
+                :disabled="!hasXuid || busy"
+                size="lg"
+                class="block-btn h-12 justify-center font-semibold"
+                :data-testid="`player-permission-${option.value}`"
+                @click="choosePermission(option.value)"
+              >
+                {{ option.label }}
+              </UButton>
+            </div>
+            <p class="text-sm text-muted">
+              {{ hasXuid ? permissionText : "Erst möglich, wenn der Spieler einmal da war." }}
+            </p>
           </div>
 
           <UButton
@@ -320,6 +380,33 @@ async function unban() {
           >
             Abbrechen
           </UButton>
+        </div>
+
+        <div v-else-if="view === 'operator'" class="flex flex-col gap-3">
+          <p>
+            {{ player.name }} darf als Operator Befehle nutzen und Einstellungen ändern, zum Beispiel cheaten.
+          </p>
+          <div class="grid grid-cols-2 gap-2">
+            <UButton
+              color="neutral"
+              variant="subtle"
+              size="xl"
+              block
+              class="block-btn"
+              :disabled="busy"
+              @click="view = 'menu'"
+            >
+              Abbrechen
+            </UButton>
+            <HoldButton
+              label="Halten: Operator machen"
+              icon="i-lucide-shield"
+              color="warning"
+              :disabled="busy"
+              data-testid="player-operator-confirm"
+              @confirm="setPermission('operator')"
+            />
+          </div>
         </div>
       </div>
     </template>

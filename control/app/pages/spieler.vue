@@ -21,7 +21,9 @@ const seen = computed(() => players.value.filter((p) => !p.online && !p.banned &
 const feedback = useFeedback();
 const closed = computed(() => data.value?.closed ?? false);
 const newPlayers = computed(() => data.value?.newPlayers ?? "member");
-const unlistedOnline = computed(() => (data.value?.players ?? []).filter((p) => p.online && !p.whitelisted));
+const unlistedOnline = computed(() =>
+  (data.value?.players ?? []).filter((p) => p.online && !p.whitelisted && !p.banned)
+);
 const accessBusy = ref(false);
 const askClose = ref(false);
 
@@ -85,23 +87,25 @@ async function add() {
   adding.value = false;
 }
 
-/** Spieler, dessen Sheet offen ist. `?spieler=<Name>` öffnet es gleich (aus der Online-Liste auf Spielen). */
+/** Spieler, dessen Sheet offen ist, steht in der Adresse (`?spieler=<Name>`). So öffnet die Online-Liste auf Spielen es direkt. */
 const route = useRoute();
 const router = useRouter();
-const selected = ref<string | null>(null);
+// Erst im Browser öffnen: Das Sheet braucht das Fenster.
+const mounted = ref(false);
+onMounted(() => (mounted.value = true));
+const selected = computed(() =>
+  mounted.value && typeof route.query.spieler === "string" ? route.query.spieler : null
+);
 const selectedPlayer = computed(() => {
   const key = selected.value?.toLowerCase();
   return data.value?.players.find((p) => p.name.toLowerCase() === key) ?? null;
 });
 
-// Erst im Browser öffnen: Das Sheet braucht das Fenster.
-onMounted(() => {
-  if (typeof route.query.spieler === "string") selected.value = route.query.spieler;
-});
+function openSheet(name: string) {
+  void router.replace({ query: { spieler: name } });
+}
 
 function closeSheet() {
-  selected.value = null;
-  // Sonst geht das Sheet beim Neuladen wieder auf.
   if (route.query.spieler !== undefined) void router.replace({ query: {} });
 }
 
@@ -229,7 +233,7 @@ watch([data, selected], () => {
           v-for="player in online"
           :key="player.name"
           :player="player"
-          @open="selected = player.name"
+          @open="openSheet(player.name)"
         />
       </ul>
     </section>
@@ -242,7 +246,7 @@ watch([data, selected], () => {
           v-for="player in whitelisted"
           :key="player.name"
           :player="player"
-          @open="selected = player.name"
+          @open="openSheet(player.name)"
         />
       </ul>
     </section>
@@ -254,7 +258,7 @@ watch([data, selected], () => {
           v-for="player in banned"
           :key="player.name"
           :player="player"
-          @open="selected = player.name"
+          @open="openSheet(player.name)"
         />
       </ul>
     </section>
@@ -275,7 +279,7 @@ watch([data, selected], () => {
           v-for="player in seen"
           :key="player.name"
           :player="player"
-          @open="selected = player.name"
+          @open="openSheet(player.name)"
         />
       </ul>
     </details>

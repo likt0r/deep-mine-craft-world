@@ -25,10 +25,10 @@ describe("GET /api/players", () => {
     expect(res.status).toBe(200);
     expect(res.body.players).toEqual([
       // Schreibweise aus dem Spiel, XUID aus den Logs
-      { name: "Anna", xuid: "3000", online: true, whitelisted: false, banned: null },
+      { name: "Anna", xuid: "3000", online: true, whitelisted: false, banned: null, permission: "member" },
       // Nur auf der Whitelist, noch nie da gewesen
-      { name: "Ben", xuid: null, online: false, whitelisted: true, banned: null },
-      { name: "Tom", xuid: "2000", online: false, whitelisted: true, banned: null }
+      { name: "Ben", xuid: null, online: false, whitelisted: true, banned: null, permission: "member" },
+      { name: "Tom", xuid: "2000", online: false, whitelisted: true, banned: null, permission: "member" }
     ]);
   });
 
@@ -38,7 +38,7 @@ describe("GET /api/players", () => {
     const res = await h.request("/api/players");
 
     expect(res.body.players).toEqual([
-      { name: "Neu", xuid: "1000", online: true, whitelisted: false, banned: null }
+      { name: "Neu", xuid: "1000", online: true, whitelisted: false, banned: null, permission: "member" }
     ]);
   });
 
@@ -92,15 +92,17 @@ describe("GET /api/players mit Sperren", () => {
         xuid: "4000",
         online: false,
         whitelisted: false,
-        banned: { reason: null, since: null }
+        banned: { reason: null, since: null },
+        permission: "member"
       },
-      { name: "Lena", xuid: "3000", online: false, whitelisted: false, banned: null },
+      { name: "Lena", xuid: "3000", online: false, whitelisted: false, banned: null, permission: "member" },
       {
         name: "Tom",
         xuid: "2000",
         online: false,
         whitelisted: false,
-        banned: { reason: "Hat alles angezündet", since: "2026-10-24T12:00:00" }
+        banned: { reason: "Hat alles angezündet", since: "2026-10-24T12:00:00" },
+        permission: "member"
       }
     ]);
   });
@@ -189,6 +191,19 @@ describe("PUT /api/players/access", () => {
     expect(h.fake.state.allowlist).toEqual([whitelistEntry("Lena"), whitelistEntry("Ben")]);
     expect(h.fake.state.properties["allow-list"]).toBe("true");
     expect(h.fake.commands()).toEqual(["allowlist reload", "allowlist on"]);
+  });
+
+  it("nimmt beim Schließen keinen gesperrten Spieler auf die Whitelist", async () => {
+    h.fake.state.players = ["Lena", "Griefer"];
+    h.fake.state.bans = [{ player_name: "Griefer", xuid: "1001", reason: null, banned_at: null }];
+
+    const res = await h.request("/api/players/access", {
+      method: "PUT",
+      body: { closed: true, onlineNotListed: "whitelist" }
+    });
+
+    expect(res.status).toBe(200);
+    expect(h.fake.state.allowlist).toEqual([whitelistEntry("Lena")]);
   });
 
   it("schließt den Zugang und kickt Online-Spieler ohne Whitelist", async () => {
@@ -439,7 +454,8 @@ describe("DELETE /api/players/ban", () => {
       xuid: "3000",
       online: false,
       whitelisted: false,
-      banned: null
+      banned: null,
+      permission: "member"
     });
   });
 
@@ -450,5 +466,85 @@ describe("DELETE /api/players/ban", () => {
 
     expect(res.status).toBe(400);
     expect(h.fake.state.bans).toHaveLength(1);
+  });
+});
+
+describe("PUT /api/players/permission", () => {
+  it("ohne eigenen Eintrag gilt das Recht für neue Spieler", async () => {
+    h.fake.state.knownPlayers = [{ name: "Steve", xuid: "2535" }];
+    h.fake.state.properties["default-player-permission-level"] = "visitor";
+
+    const res = await h.request("/api/players");
+
+    expect(res.body.players[0].permission).toBe("visitor");
+  });
+
+  it("liefert permission im GET", async () => {
+    h.fake.state.knownPlayers = [{ name: "Steve", xuid: "2535" }];
+    h.fake.state.permissions = [{ xuid: "2535", name: "Steve", permission_level: "operator" }];
+
+    const res = await h.request("/api/players");
+
+    expect(res.status).toBe(200);
+    expect(res.body.players[0].permission).toBe("operator");
+  });
+
+  it("setzt permission und löst permission reload aus, wenn der Server läuft", async () => {
+    h.fake.state.knownPlayers = [{ name: "Steve", xuid: "2535" }];
+
+    const res = await h.request("/api/players/permission", {
+      method: "PUT",
+      body: { xuid: "2535", permission: "operator" }
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true });
+    expect(h.fake.state.permissions).toEqual([{ xuid: "2535", name: "Steve", permission_level: "operator" }]);
+    expect(h.fake.commands()).toEqual(["permission reload"]);
+  });
+
+  it("bei gestopptem Server kein Befehl", async () => {
+    h.fake.state.status = "STOPPED";
+    h.fake.state.knownPlayers = [{ name: "Steve", xuid: "2535" }];
+
+    const res = await h.request("/api/players/permission", {
+      method: "PUT",
+      body: { xuid: "2535", permission: "member" }
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true });
+    expect(h.fake.state.permissions[0]).toEqual({ xuid: "2535", name: "Steve", permission_level: "member" });
+    expect(h.fake.commands()).toEqual([]);
+  });
+
+  it("unbekannte xuid gibt 404", async () => {
+    const res = await h.request("/api/players/permission", {
+      method: "PUT",
+      body: { xuid: "12345", permission: "visitor" }
+    });
+
+    expect(res.status).toBe(404);
+    expect(h.fake.commands()).toEqual([]);
+  });
+
+  it("ungültige Stufe oder xuid gibt 400", async () => {
+    h.fake.state.knownPlayers = [{ name: "Steve", xuid: "2535" }];
+    const res1 = await h.request("/api/players/permission", {
+      method: "PUT",
+      body: { xuid: "2535", permission: "admin" }
+    });
+    expect(res1.status).toBe(400);
+    const res2 = await h.request("/api/players/permission", {
+      method: "PUT",
+      body: { xuid: "abc", permission: "visitor" }
+    });
+    expect(res2.status).toBe(400);
+    const res3 = await h.request("/api/players/permission", {
+      method: "PUT",
+      body: { xuid: "123456789012345678901", permission: "visitor" }
+    });
+    expect(res3.status).toBe(400);
+    expect(h.fake.commands()).toEqual([]);
   });
 });

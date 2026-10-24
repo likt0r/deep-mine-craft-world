@@ -18,7 +18,8 @@ export default defineEventHandler(async (event) => {
 
   if (closed === true) {
     const { players } = await readPlayers();
-    const unlisted = players.filter((player) => player.online && !player.whitelisted);
+    // Gesperrte kickt BSM ohnehin, sie kommen nie auf die Whitelist.
+    const unlisted = players.filter((player) => player.online && !player.whitelisted && !player.banned);
     if (unlisted.length > 0) {
       if (!onlineNotListed)
         throw createError({

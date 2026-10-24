@@ -313,3 +313,82 @@ test.describe("Sperren", () => {
     );
   });
 });
+
+test.describe("Spielerrechte", () => {
+  test("Besucher setzen", async ({ page }) => {
+    await fake.set({ knownPlayers: [{ name: "Tom", xuid: "2000" }] });
+    await page.goto("/spieler");
+
+    await page.getByText("Schon mal da gewesen (1)").click();
+    await page.getByTestId("players-seen").getByTestId("player-row").click();
+
+    const sheet = page.getByRole("dialog");
+    await expect(sheet.getByTestId("player-permission-member")).toHaveAttribute("aria-pressed", "true");
+    await sheet.getByTestId("player-permission-visitor").click();
+
+    await expect(sheet.getByTestId("player-permission-visitor")).toHaveAttribute("aria-pressed", "true");
+    await expect(sheet.getByText("Kann nur zuschauen, nichts abbauen oder bauen.")).toBeVisible();
+    await expect(toast(page, "Tom ist jetzt Besucher.")).toBeVisible();
+    expect((await fake.get()).permissions[0]?.permission_level).toBe("visitor");
+    expect(await fake.commands()).toContain("permission reload");
+    await expect(page.getByTestId("players-seen").getByTestId("player-row")).toContainText("Besucher");
+  });
+
+  test("Operator nur per Halten", async ({ page }) => {
+    await fake.set({ knownPlayers: [{ name: "Tom", xuid: "2000" }] });
+    await page.goto("/spieler");
+
+    await page.getByText("Schon mal da gewesen (1)").click();
+    await page.getByTestId("players-seen").getByTestId("player-row").click();
+
+    const sheet = page.getByRole("dialog");
+    await sheet.getByTestId("player-permission-operator").click();
+    await expect(sheet.getByText("Tom darf als Operator Befehle nutzen", { exact: false })).toBeVisible();
+    expect((await fake.get()).permissions).toEqual([]);
+
+    const hold = sheet.getByRole("button", { name: /Halten: Operator machen/ });
+    const box = await hold.boundingBox();
+    if (!box) throw new Error("missing hold button");
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(3400);
+    await page.mouse.up();
+
+    await expect(sheet.getByTestId("player-permission-operator")).toHaveAttribute("aria-pressed", "true");
+    await expect(sheet.getByText("Darf Befehle nutzen und Einstellungen ändern.")).toBeVisible();
+    await expect(toast(page, "Tom ist jetzt Operator.")).toBeVisible();
+    expect((await fake.get()).permissions[0]?.permission_level).toBe("operator");
+    await expect(page.getByTestId("players-seen").getByTestId("player-row")).toContainText("Operator");
+  });
+
+  test("ohne eigenen Eintrag gilt das Recht für neue Spieler", async ({ page }) => {
+    await fake.set({
+      knownPlayers: [{ name: "Tom", xuid: "2000" }],
+      properties: { ...(await fake.get()).properties, "default-player-permission-level": "visitor" }
+    });
+    await page.goto("/spieler");
+
+    await page.getByText("Schon mal da gewesen (1)").click();
+    await page.getByTestId("players-seen").getByTestId("player-row").click();
+
+    await expect(page.getByRole("dialog").getByTestId("player-permission-visitor")).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+  });
+
+  test("ohne XUID ausgegraut", async ({ page }) => {
+    await fake.set({ allowlist: [whitelistEntry("Ben")] });
+    await page.goto("/spieler");
+
+    await page.getByTestId("players-whitelist").getByTestId("player-row").click();
+
+    const sheet = page.getByRole("dialog");
+    await expect(
+      sheet.getByTestId("player-permission").getByText("Erst möglich, wenn der Spieler einmal da war.")
+    ).toBeVisible();
+    await expect(sheet.getByRole("button", { name: "Besucher" })).toBeDisabled();
+    await expect(sheet.getByRole("button", { name: "Mitglied" })).toBeDisabled();
+    await expect(sheet.getByRole("button", { name: "Operator" })).toBeDisabled();
+  });
+});

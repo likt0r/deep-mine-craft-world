@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ player: PlayerInfo }>();
+const props = defineProps<{ player: PlayerInfo }>();
 const emit = defineEmits<{ open: [] }>();
 
 /** „Hat alles angezündet · seit 24.10.2026“ */
@@ -8,6 +8,17 @@ function banLine(banned: NonNullable<PlayerInfo["banned"]>) {
   if (banned.since) parts.push(`seit ${formatDate(banned.since)}`);
   return parts.join(" · ");
 }
+
+/** Zweite Zeile: Whitelist nur bei Online-Spielern (sonst steht er im Abschnitt Whitelist), Mitglied ist normal. */
+const details = computed(() =>
+  [
+    props.player.online && props.player.whitelisted && "Auf der Whitelist",
+    props.player.permission === "operator" && "Operator",
+    props.player.permission === "visitor" && "Besucher"
+  ]
+    .filter(Boolean)
+    .join(" · ")
+);
 </script>
 
 <template>
@@ -24,9 +35,7 @@ function banLine(banned: NonNullable<PlayerInfo["banned"]>) {
         <span v-if="player.banned" class="truncate text-sm text-error" data-testid="player-row-ban">
           {{ banLine(player.banned) }}
         </span>
-        <span v-else-if="player.online && player.whitelisted" class="text-sm text-muted"
-          >Auf der Whitelist</span
-        >
+        <span v-else-if="details" class="text-sm text-muted">{{ details }}</span>
       </span>
       <UIcon name="i-lucide-chevron-right" class="size-5 shrink-0 text-dimmed" />
     </button>

@@ -31,6 +31,8 @@ export interface FakeState {
   allowlist: { name: string; xuid: string | null; ignoresPlayerLimit: boolean }[];
   /** Gesperrte Spieler (`bans/get`). BSM kickt sie selbst bei jedem Spielerscan, das spielt der Fake nicht nach. */
   bans: { player_name: string; xuid: string; reason: string | null; banned_at: string | null }[];
+  /** permissions.json */
+  permissions: { xuid: string; name: string; permission_level: "visitor" | "member" | "operator" }[];
   properties: Record<string, string>;
   /**
    * Spielregeln, die auf `gamerule` ohne Argumente in die Server-Ausgabe geschrieben werden,
@@ -94,6 +96,7 @@ function initialState(): FakeState {
     knownPlayers: [],
     allowlist: [],
     bans: [],
+    permissions: [],
     properties: {
       "level-name": DEFAULT_LEVEL_NAME,
       gamemode: "creative",
@@ -467,6 +470,35 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
         if (!properties) return bsmError(res, 422, "validation_error", "API data failed validation.");
         Object.assign(fake.state.properties, properties);
         return send(res, 200, { status: "success", server_name: SERVER, message: "ok" });
+      }
+      case "GET permissions/get":
+        return send(res, 200, { status: "success", message: null, permissions: fake.state.permissions });
+      case "POST permissions/set": {
+        const permissions =
+          (
+            body as {
+              permissions?: Array<{
+                xuid: string;
+                name: string;
+                permission_level: "visitor" | "member" | "operator";
+              }>;
+            } | null
+          )?.permissions ?? [];
+        const outcomes: Record<string, { outcome: "completed" }> = {};
+        for (const p of permissions) {
+          const idx = fake.state.permissions.findIndex((a) => a.xuid === p.xuid);
+          if (idx >= 0) {
+            fake.state.permissions[idx] = {
+              xuid: p.xuid,
+              name: p.name,
+              permission_level: p.permission_level
+            };
+          } else {
+            fake.state.permissions.push({ xuid: p.xuid, name: p.name, permission_level: p.permission_level });
+          }
+          outcomes[p.xuid] = { outcome: "completed" };
+        }
+        return send(res, 200, { status: "success", message: "ok", updated: permissions.length, outcomes });
       }
       default:
         return bsmError(res, 404, "not_found", "Not Found");

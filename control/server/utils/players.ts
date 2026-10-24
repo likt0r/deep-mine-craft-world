@@ -14,12 +14,13 @@ export const playerMessage = z
  * sind ein Spieler.
  */
 export async function readPlayers(): Promise<PlayersInfo> {
-  const [summary, known, allowlist, bans, properties] = await Promise.all([
+  const [summary, known, allowlist, bans, properties, permissions] = await Promise.all([
     bsm.summary(),
     bsm.knownPlayers(),
     bsm.allowlist(),
     bsm.bans(),
-    bsm.getProperties()
+    bsm.getProperties(),
+    bsm.permissions()
   ]);
   const byName = new Map<string, PlayerInfo>();
   // Wer zuerst eingetragen wird, bestimmt die Schreibweise: erst aus dem Spiel, dann aus den Logs, dann von der Whitelist.
@@ -27,7 +28,10 @@ export async function readPlayers(): Promise<PlayersInfo> {
     const key = name.toLowerCase();
     let player = byName.get(key);
     if (!player)
-      byName.set(key, (player = { name, xuid: null, online: false, whitelisted: false, banned: null }));
+      byName.set(
+        key,
+        (player = { name, xuid: null, online: false, whitelisted: false, banned: null, permission: "member" })
+      );
     player.xuid ??= xuid || null;
     return player;
   };
@@ -39,6 +43,12 @@ export async function readPlayers(): Promise<PlayersInfo> {
     const player = [...byName.values()].find((p) => p.xuid === ban.xuid) ?? entry(ban.player_name, ban.xuid);
     player.banned = { reason: ban.reason || null, since: ban.banned_at || null };
   }
+
+  // Ohne eigenen Eintrag gilt das Recht für neue Spieler.
+  const fallback = (properties["default-player-permission-level"] ?? "member") as Permission;
+  const byXuid = new Map(permissions.map((p) => [p.xuid, p.permission_level]));
+  for (const player of byName.values())
+    player.permission = (player.xuid && byXuid.get(player.xuid)) || fallback;
 
   const players = [...byName.values()].sort(
     (a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name, "de")
@@ -53,7 +63,7 @@ export async function readPlayers(): Promise<PlayersInfo> {
 }
 
 /** Schickt einen `… reload`, damit der laufende Server geänderte Listen liest. Gestoppt liest er sie beim Start. */
-export async function reloadIfRunning(command: "allowlist reload") {
+export async function reloadIfRunning(command: "allowlist reload" | "permission reload") {
   const { status } = await bsm.summary();
   if (mapServerState(status) === "running") await bsm.sendCommand(command);
 }
