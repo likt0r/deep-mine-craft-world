@@ -1,15 +1,15 @@
 # Deep Mine Craft World
 
-Unser Minecraft-Bedrock-Server für die Familie. Admins verwalten ihn über BSM, die Kinder steuern das Spiel über Deep Mine Control.
+Unser Minecraft-Bedrock-Server für die Familie. Deep Mine Control steuert Spiel, Welten und Spieler. Admins nutzen bei Bedarf noch BSM.
 
 ## Language
 
 **Deep Mine Control**:
-Die Tablet-Oberfläche ohne Anmeldung, mit der Kinder im LAN Spiel und Welten steuern.
+Die Oberfläche, mit der Spiel, Welten und Spieler gesteuert werden. Im Heimnetz ohne Anmeldung.
 _Avoid_: Spielplatz, Kinder-UI, Dashboard
 
 **BSM**:
-Bedrock Server Manager, die Admin-Oberfläche mit Anmeldung, die den Bedrock-Server betreibt.
+Bedrock Server Manager, der Dienst im Hintergrund, der den Bedrock-Server betreibt. Für den Alltag nicht mehr nötig.
 _Avoid_: Manager, Admin-Panel
 
 **Platz**:
@@ -51,3 +51,26 @@ _Avoid_: Upgrade, Deploy
 
 **Autoupdate**:
 Installiert ein Update von selbst, sobald niemand spielt.
+
+**Spieler**:
+Ein Xbox-Konto mit Gamertag, das auf dem Server war oder eingetragen ist.
+_Avoid_: User, Account
+
+**Zugang**:
+Offen (jeder außer gesperrten Spielern kann beitreten) oder geschlossen (nur Spieler auf der Whitelist).
+_Avoid_: Modus, Offline-Modus
+
+**Whitelist**:
+Spieler, die bei geschlossenem Zugang beitreten dürfen.
+_Avoid_: Allowlist, Freigabeliste
+
+**Sperren**:
+Ein gesperrter Spieler wird sofort und bei jedem Beitreten gekickt.
+_Avoid_: Bann, Blacklist
+
+**Kicken**:
+Einen Online-Spieler einmal rauswerfen. Er kann wieder beitreten.
+
+**Recht**:
+Besucher (nur schauen), Mitglied (normal spielen) oder Operator (Befehle).
+_Avoid_: Rolle, Permission

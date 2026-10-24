@@ -7,6 +7,7 @@ const AREAS = [
   { path: "/", nav: "nav-spielen" },
   { path: "/welten", nav: "nav-welten" },
   { path: "/regeln", nav: "nav-regeln" },
+  { path: "/spieler", nav: "nav-spieler" },
   { path: "/system", nav: "nav-system" }
 ];
 
@@ -14,7 +15,7 @@ test.beforeEach(async () => {
   await fake.reset();
 });
 
-test("die vier Bereiche sind über die Navigation erreichbar, der aktive ist markiert", async ({ page }) => {
+test("die fünf Bereiche sind über die Navigation erreichbar, der aktive ist markiert", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("nav-spielen")).toHaveAttribute("aria-current", "page");
 
