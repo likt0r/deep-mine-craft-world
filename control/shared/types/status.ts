@@ -11,6 +11,8 @@ export interface Status {
   busy: boolean;
   /** Ziel des laufenden Weltwechsels (Laden oder Anlegen), sonst `null`. */
   switching: WorldSwitch | null;
+  /** Was gerade aktualisiert wird, sonst `null`. */
+  updating: UpdateKind | null;
 }
 
 /** Ein Weltwechsel: erst 10 s Countdown im Chat (wenn jemand spielt), dann sichern (wenn eingestellt), dann Neustart. */

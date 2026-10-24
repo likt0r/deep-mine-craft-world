@@ -33,7 +33,7 @@ Eine Welt endgültig entfernen, samt ihrer Backups. Die aktive Welt kann nicht g
 _Avoid_: zurücksetzen, entfernen
 
 **Weltvorgang**:
-Laden, Anlegen oder Löschen einer Welt. Es läuft immer höchstens einer gleichzeitig.
+Alles, was die aktive Welt anhält oder Welten verändert: Laden, Anlegen, Löschen, Zurückspielen und Minecraft-Update. Es läuft immer höchstens einer gleichzeitig.
 
 **Welttyp**:
 Normal oder flach. Wird beim Anlegen festgelegt und ändert sich nie.
@@ -41,3 +41,13 @@ Normal oder flach. Wird beim Anlegen festgelegt und ändert sich nie.
 **Spielregel**:
 Ein Schalter, der zur Welt gehört, z. B. „Sachen beim Sterben behalten“ oder „Zeit anhalten“.
 _Avoid_: Gamerule, Einstellung
+
+**Version**:
+Der Stand von Deep Mine Control oder vom Minecraft-Server, z. B. „1.26.52.3“.
+
+**Update**:
+Eine neuere Version installieren. Das Verb dazu ist „aktualisieren“.
+_Avoid_: Upgrade, Deploy
+
+**Autoupdate**:
+Installiert ein Update von selbst, sobald niemand spielt.

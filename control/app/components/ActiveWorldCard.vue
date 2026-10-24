@@ -13,6 +13,7 @@ const active = computed(() => places.value?.places.find((p) => p.active));
 
 const badge = computed(() => {
   // Was gerade passiert, steht ausführlich darunter und in der Statusleiste.
+  if (status.value?.updating) return { label: "Aktualisiert …", color: "warning" as const };
   if (status.value?.busy) return { label: "Wechselt …", color: "warning" as const };
   switch (status.value?.state) {
     case "running":

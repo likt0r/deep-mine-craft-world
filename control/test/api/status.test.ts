@@ -21,7 +21,8 @@ describe("GET /api/status", () => {
       world: "Pandaland",
       players: ["Lena", "Tom"],
       busy: false,
-      switching: null
+      switching: null,
+      updating: null
     });
   });
 

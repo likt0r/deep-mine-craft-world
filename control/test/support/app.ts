@@ -54,6 +54,8 @@ export async function startApp(fake: FakeBsm, fixture: ServerFixture, port?: num
       NUXT_WORLD_MAX_BYTES: "1000000",
       NUXT_RESOLVECTL_PATH: fakeIp,
       NUXT_COUNTDOWN_STEP_MS: "0",
+      // Das Fake-BSM spielt auch die Download-Links von Mojang.
+      NUXT_MOJANG_LINKS_URL: `${fake.url}/mojang/links`,
       NUXT_RULES_WAIT_MS: "4000"
     },
     stdio: ["ignore", "inherit", "inherit"]

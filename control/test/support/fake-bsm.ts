@@ -12,6 +12,8 @@ import { DEFAULT_LEVEL_NAME, type ServerFixture } from "./fixture";
  *
  * Steuerung von außen (für Playwright): GET/POST /__fake/state, POST /__fake/reset,
  * POST /__fake/expire-tokens, POST /__fake/seed-place ({ place, world }, siehe ServerFixture.seedPlace).
+ *
+ * Spielt außerdem die Download-Links von Mojang (GET /mojang/links, ohne Anmeldung).
  */
 
 export const FAKE_USER = "deep-mine-control";
@@ -43,8 +45,14 @@ export interface FakeState {
   admin: boolean;
   /** Plugins und ob sie an sind */
   plugins: Record<string, boolean>;
-  /** Backup- und Restore-Aufgaben scheitern. */
+  /** Backup-, Restore- und Update-Aufgaben scheitern. */
   tasksFail: boolean;
+  /** Installierte Minecraft-Version (summary) */
+  version: string;
+  /** Neueste Version laut Mojang-Links. Ein Update installiert sie. */
+  latestVersion: string;
+  /** Mojang ist nicht erreichbar (die Links antworten mit 503). */
+  mojangDown: boolean;
 }
 
 export interface FakeCall {
@@ -82,7 +90,10 @@ function initialState(): FakeState {
     failing: false,
     admin: true,
     plugins: { backup_on_start: false },
-    tasksFail: false
+    tasksFail: false,
+    version: "1.26.52.3",
+    latestVersion: "1.26.52.3",
+    mojangDown: false
   };
 }
 
@@ -125,15 +136,24 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
     close: () => new Promise((resolve) => server.close(() => resolve()))
   };
 
-  /** Aufgaben (Backup, Restore). Erst „running“, dann fertig – oder gescheitert, wenn `tasksFail`. */
+  /**
+   * Aufgaben (Backup, Restore, Update). Erst „running“, dann fertig – oder gescheitert, wenn `tasksFail`.
+   * `restart`: Der Server startet dabei neu. `update`: Vorher wird die neueste Version installiert.
+   */
   const tasks = new Map<
     string,
     { status: string; message: string; result: null; error: { message: string } | null }
   >();
-  function startTask(restart = false): string {
+  function startTask(restart = false, update = false): string {
     const id = randomBytes(8).toString("hex");
     tasks.set(id, { status: "running", message: "läuft", result: null, error: null });
     void (async () => {
+      if (update && !fake.state.tasksFail) {
+        // Wie BSM: stoppen, (sichern,) installieren, starten.
+        fake.state.status = "UPDATING";
+        await sleep(50);
+        fake.state.version = fake.state.latestVersion;
+      }
       if (restart && !fake.state.tasksFail) await boot();
       else await sleep(50);
       tasks.set(
@@ -183,6 +203,27 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
     if (path === "/__fake/expire-tokens") {
       fake.expireTokens();
       return send(res, 200, {});
+    }
+
+    // --- Download-Links von Mojang (gleiche Form wie das Original, ohne Anmeldung) ---
+    if (path === "/mojang/links" && req.method === "GET") {
+      if (fake.state.mojangDown) return send(res, 503, { error: "Service Unavailable" });
+      const zip = (dir: string, version: string) =>
+        `https://www.minecraft.net/bedrockdedicatedserver/${dir}/bedrock-server-${version}.zip`;
+      // Die Preview ist neuer, zählt aber nicht.
+      return send(res, 200, {
+        result: {
+          links: [
+            { downloadType: "serverBedrockWindows", downloadUrl: zip("bin-win", fake.state.latestVersion) },
+            { downloadType: "serverBedrockLinux", downloadUrl: zip("bin-linux", fake.state.latestVersion) },
+            { downloadType: "serverBedrockPreviewLinux", downloadUrl: zip("bin-linux-preview", "9.9.99.9") },
+            {
+              downloadType: "serverJar",
+              downloadUrl: "https://piston-data.mojang.com/v1/objects/abc/server.jar"
+            }
+          ]
+        }
+      });
     }
 
     let body: unknown = raw;
@@ -242,7 +283,7 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
         return send(res, 200, {
           name: SERVER,
           status: fake.state.status,
-          version: "1.26.52.3",
+          version: fake.state.version,
           players_available: true,
           player_count: fake.state.players.length,
           players: fake.state.players.map((name, i) => ({ name, xuid: String(1000 + i) }))
@@ -264,6 +305,9 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
         const id = startTask(true);
         return send(res, 202, { status: "accepted", message: "ok", task_id: id });
       }
+      case "POST update":
+        // BSM stoppt den Server, sichert, installiert die neueste Version und startet ihn wieder.
+        return send(res, 202, { status: "accepted", message: "ok", task_id: startTask(true, true) });
       case "POST stop":
         fake.state.status = "STOPPED";
         return send(res, 200, { status: "success", server_name: SERVER, message: "ok" });

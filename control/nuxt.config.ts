@@ -35,6 +35,8 @@ export default defineNuxtConfig({
     pythonPath: "python3",
     /** Höchstens so groß darf eine Welt ausgepackt sein (Schutz vor ZIP-Bomben, 4 GB). */
     worldMaxBytes: 4 * 1024 ** 3,
+    /** Download-Links von Mojang. Daraus kommt die neueste Version des Minecraft-Servers (Linux). */
+    mojangLinksUrl: "https://net-secondary.web.minecraft-services.net/api/v1.0/download/links",
     /** Länge einer Countdown-Sekunde beim Weltwechsel. Tests setzen 0. */
     countdownStepMs: 1000,
     /** So lange wartet das Auslesen der Spielregeln auf die Ausgabe von `gamerule`. */

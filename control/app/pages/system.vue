@@ -4,15 +4,20 @@ useSeoMeta({ title: "System · Deep Mine Control" });
 const TABS = [
   { to: "/system", label: "Übersicht", icon: "i-lucide-activity", testid: "system-tab-overview" },
   { to: "/system/netzwerk", label: "Netzwerk", icon: "i-lucide-network", testid: "system-tab-netzwerk" },
-  { to: "/system/backups", label: "Backups", icon: "i-lucide-archive", testid: "system-tab-backups" }
+  { to: "/system/backups", label: "Backups", icon: "i-lucide-archive", testid: "system-tab-backups" },
+  { to: "/system/updates", label: "Updates", icon: "i-lucide-download", testid: "system-tab-updates" }
 ];
 </script>
 
 <template>
   <UContainer class="flex flex-col gap-3.5 py-5 lg:max-w-4xl">
     <h1 class="font-pixel text-3xl font-bold text-highlighted">System</h1>
-    <!-- Unterbereiche von System, im Stil der Segment-Knöpfe -->
-    <nav aria-label="System" class="grid grid-cols-3 gap-2 sm:max-w-lg" data-testid="system-tabs">
+    <!-- Unterbereiche von System, im Stil der Segment-Knöpfe. Auf dem Handy 2×2. -->
+    <nav
+      aria-label="System"
+      class="grid grid-cols-2 gap-2 sm:max-w-2xl sm:grid-cols-4"
+      data-testid="system-tabs"
+    >
       <NuxtLink
         v-for="tab in TABS"
         :key="tab.to"

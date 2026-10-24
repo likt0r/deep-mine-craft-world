@@ -39,3 +39,22 @@ const SWITCH_PHASES: Record<WorldSwitch["phase"], string> = {
 export function switchPhaseLabel(phase: WorldSwitch["phase"]): string {
   return SWITCH_PHASES[phase];
 }
+
+const UPDATING: Record<UpdateKind, string> = {
+  minecraft: "Minecraft wird aktualisiert",
+  control: "Deep Mine Control wird aktualisiert"
+};
+
+export function updatingLabel(kind: UpdateKind): string {
+  return UPDATING[kind];
+}
+
+const UPDATE_PHASES: Record<UpdateRun["phase"], string> = {
+  countdown: "Countdown im Spiel",
+  updating: "BSM sichert, installiert und startet neu",
+  failed: "Fehlgeschlagen"
+};
+
+export function updatePhaseLabel(phase: UpdateRun["phase"]): string {
+  return UPDATE_PHASES[phase];
+}

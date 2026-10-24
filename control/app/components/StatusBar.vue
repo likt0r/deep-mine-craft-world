@@ -1,5 +1,8 @@
 <script setup lang="ts">
-/** Schmale Leiste oben in allen Bereichen: verbunden, Welt wird geladen, Server aus, keine Verbindung. */
+/**
+ * Schmale Leiste oben in allen Bereichen: verbunden, Welt wird geladen, Update läuft, Server aus,
+ * keine Verbindung.
+ */
 const route = useRoute();
 const { status, connection } = useServerStatus();
 
@@ -40,6 +43,14 @@ const view = computed<View>(() => {
       text: "Verbinde …",
       tone: "neutral",
       icon: "i-lucide-loader-circle",
+      spin: true
+    };
+  if (s.updating)
+    return {
+      state: "updating",
+      text: updatingLabel(s.updating),
+      icon: "i-lucide-loader-circle",
+      tone: "warning",
       spin: true
     };
   if (s.switching)

@@ -10,6 +10,7 @@ export default defineEventHandler(async (): Promise<Status> => {
     world: places.find((p) => p.active)?.world?.name ?? properties["level-name"] ?? "",
     players: summary.players.map((p) => p.name),
     busy: isWorldOperationRunning(),
-    switching: currentWorldSwitch()
+    switching: currentWorldSwitch(),
+    updating: updatingNow()
   };
 });
