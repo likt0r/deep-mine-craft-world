@@ -30,7 +30,7 @@ SYSTEMD_RUN = os.environ.get("SYSTEMD_RUN", "systemd-run")
 SYSTEMCTL = os.environ.get("SYSTEMCTL", "systemctl")
 IP = os.environ.get("IP", "ip")
 ROLLBACK_SECONDS = int(os.environ.get("ROLLBACK_SECONDS", "120"))
-SELF = os.environ.get("SELF", "/usr/local/bin/deep-mine-ethernet")
+SELF = os.environ.get("SELF", "/usr/lib/deep-mine-control/bin/deep-mine-ethernet")
 
 REQUEST = os.path.join(DATA_DIR, "ethernet-request.json")
 CONFIRM = os.path.join(DATA_DIR, "ethernet-confirm.json")

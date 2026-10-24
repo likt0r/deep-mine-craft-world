@@ -39,6 +39,7 @@ export async function startApp(fake: FakeBsm, fixture: ServerFixture, port?: num
       NUXT_PROC_DIR: fixture.procDir,
       NUXT_SYS_DIR: fixture.sysDir,
       NUXT_SMART_FILE: fixture.smartFile,
+      NUXT_VERSION_FILE: fixture.versionFile,
       // Statt den Rechner neu zu starten oder auszuschalten, nur eine Datei anlegen.
       NUXT_REBOOT_COMMAND: `/usr/bin/touch ${fixture.rebootMarker}`,
       NUXT_POWEROFF_COMMAND: `/usr/bin/touch ${fixture.poweroffMarker}`,
@@ -54,6 +55,8 @@ export async function startApp(fake: FakeBsm, fixture: ServerFixture, port?: num
       NUXT_WORLD_MAX_BYTES: "1000000",
       NUXT_RESOLVECTL_PATH: fakeIp,
       NUXT_COUNTDOWN_STEP_MS: "0",
+      // Das Fake-BSM spielt auch die Download-Links von Mojang.
+      NUXT_MOJANG_LINKS_URL: `${fake.url}/mojang/links`,
       NUXT_RULES_WAIT_MS: "4000"
     },
     stdio: ["ignore", "inherit", "inherit"]

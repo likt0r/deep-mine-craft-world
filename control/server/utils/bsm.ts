@@ -8,7 +8,7 @@ interface BsmSummary {
   players: { name: string; xuid: string }[];
 }
 
-/** Hintergrundaufgabe in BSM (Backup, Restore). */
+/** Hintergrundaufgabe in BSM (Backup, Restore, Update). */
 interface BsmTask {
   status: "queued" | "running" | "completed" | "failed" | "cancelling" | "cancelled";
   message: string;
@@ -93,6 +93,11 @@ export const bsm = {
       method: "POST",
       body: { restore_type: "world", backup_file: backupFile }
     }),
+  /**
+   * Aktualisiert den Bedrock-Server auf die neueste Version (Aufgabe im Hintergrund). BSM stoppt ihn dafür,
+   * sichert alles, installiert und startet ihn wieder.
+   */
+  updateServer: () => bsmFetch<{ task_id: string }>(serverPath("update"), { method: "POST" }),
   taskStatus: (taskId: string) => bsmFetch<BsmTask>(`/api/tasks/status/${encodeURIComponent(taskId)}`),
   /** Plugins lesen und schalten darf nur ein BSM-Admin. */
   plugins: () => bsmFetch<{ plugins?: Record<string, { enabled?: boolean }> }>("/api/plugins"),

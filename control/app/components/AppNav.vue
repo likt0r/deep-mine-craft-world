@@ -1,5 +1,7 @@
 <script setup lang="ts">
 // Markiert wird der ganze Bereich (router-link-active), damit System auch unter /system/netzwerk leuchtet.
+const { available } = useUpdates();
+
 const AREAS = [
   { to: "/", label: "Spielen", icon: "i-lucide-gamepad-2" },
   { to: "/welten", label: "Welten", icon: "i-lucide-layers" },
@@ -21,9 +23,16 @@ const AREAS = [
       :key="area.to"
       :to="area.to"
       :data-testid="`nav-${area.label.toLowerCase()}`"
-      class="flex h-19 flex-col items-center justify-center gap-1 border-t-3 border-transparent font-pixel text-sm font-semibold text-muted transition-colors hover:text-default md:h-auto md:rounded-lg md:border-t-0 md:py-3 md:text-base [&.router-link-active]:border-primary [&.router-link-active]:text-primary md:[&.router-link-active]:bg-primary/15"
+      class="relative flex h-19 flex-col items-center justify-center gap-1 border-t-3 border-transparent font-pixel text-sm font-semibold text-muted transition-colors hover:text-default md:h-auto md:rounded-lg md:border-t-0 md:py-3 md:text-base [&.router-link-active]:border-primary [&.router-link-active]:text-primary md:[&.router-link-active]:bg-primary/15"
     >
-      <UIcon :name="area.icon" class="size-6" />
+      <span class="relative">
+        <UIcon :name="area.icon" class="size-6" />
+        <span
+          v-if="area.label === 'System' && available.length > 0"
+          class="absolute -right-1.5 -top-1.5 size-2 rounded-full bg-warning ring-2 ring-default"
+          data-testid="nav-update-dot"
+        />
+      </span>
       {{ area.label }}
     </NuxtLink>
   </nav>

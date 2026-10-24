@@ -1,0 +1,17 @@
+#!/bin/sh
+# Nach dem Entfernen: systemd und Caddy auf den Stand ohne Paket bringen.
+# Welten, Backups und Daten (/var/lib/bsm), BSM (/opt/bsm), der Benutzer bsm und /etc/deep-mine-control.env
+# bleiben immer liegen, auch bei purge.
+set -e
+
+case "$1" in
+  remove | purge)
+    if [ -d /run/systemd/system ]; then
+      systemctl daemon-reload || true
+      # Ohne das Drop-in liest Caddy wieder /etc/caddy/Caddyfile.
+      systemctl try-restart caddy.service || true
+    fi
+    ;;
+esac
+
+exit 0

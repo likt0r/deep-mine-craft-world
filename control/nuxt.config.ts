@@ -11,15 +11,17 @@ export default defineNuxtConfig({
     bsmServerDir: "/var/lib/bsm/data/servers/Bedrock",
     bsmBackupDir: "/var/lib/bsm/data/backups/Bedrock",
     dataDir: "/var/lib/bsm/deep-mine-control",
+    /** Versionsdatei aus dem Paket (packaging/build-deb.sh). Fehlt sie, meldet der Status „dev“. */
+    versionFile: "/usr/lib/deep-mine-control/app/version.json",
     /** Für den Bereich System. Tests legen eigene Dateien unter. */
     procDir: "/proc",
     sysDir: "/sys",
-    /** `smartctl --json -x` der Systemplatte, geschrieben vom Timer deep-mine-smart (install.sh) */
+    /** `smartctl --json -x` der Systemplatte, geschrieben vom Timer deep-mine-smart (Paket) */
     smartFile: "/var/lib/bsm/deep-mine-control/smart.json",
-    /** Rechner neu starten und ausschalten. Darf `bsm` per polkit (install.sh). Tests setzen harmlose Befehle. */
+    /** Rechner neu starten und ausschalten. Darf `bsm` per polkit (Paket). Tests setzen harmlose Befehle. */
     rebootCommand: "systemctl reboot",
     poweroffCommand: "systemctl poweroff",
-    /** WLAN über NetworkManager (install.sh). Tests setzen ein Fake-nmcli. */
+    /** WLAN über NetworkManager (Paket). Tests setzen ein Fake-nmcli. */
     nmcliPath: "nmcli",
     iwPath: "iw",
     wifiDevice: "wlp3s0",
@@ -35,6 +37,8 @@ export default defineNuxtConfig({
     pythonPath: "python3",
     /** Höchstens so groß darf eine Welt ausgepackt sein (Schutz vor ZIP-Bomben, 4 GB). */
     worldMaxBytes: 4 * 1024 ** 3,
+    /** Download-Links von Mojang. Daraus kommt die neueste Version des Minecraft-Servers (Linux). */
+    mojangLinksUrl: "https://net-secondary.web.minecraft-services.net/api/v1.0/download/links",
     /** Länge einer Countdown-Sekunde beim Weltwechsel. Tests setzen 0. */
     countdownStepMs: 1000,
     /** So lange wartet das Auslesen der Spielregeln auf die Ausgabe von `gamerule`. */

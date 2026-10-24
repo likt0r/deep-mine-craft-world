@@ -61,6 +61,7 @@ async function act(path: string, message: string) {
 
 <template>
   <div class="flex flex-col gap-3.5">
+    <UpdateHints />
     <p class="text-muted">Wie es dem Rechner geht. Die Werte aktualisieren sich von selbst.</p>
 
     <section

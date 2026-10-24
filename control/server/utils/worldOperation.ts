@@ -1,6 +1,6 @@
-// Weltvorgänge (Laden, Anlegen, Löschen) laufen nie gleichzeitig. Laden und Anlegen dauern mit
-// Countdown und Neustart 30 s und länger, deshalb laufen sie im Hintergrund weiter, während die
-// Seite über `busy` im Status sieht, dass gerade etwas passiert.
+// Weltvorgänge (Laden, Anlegen, Löschen, Zurückspielen, Minecraft-Update) laufen nie gleichzeitig.
+// Die langen dauern mit Countdown und Neustart 30 s und länger, deshalb laufen sie im Hintergrund
+// weiter, während die Seite über `busy` im Status sieht, dass gerade etwas passiert.
 
 let running = false;
 /** Ziel des laufenden Weltwechsels (Laden, Anlegen), damit die Seite es zeigen kann. */
@@ -34,14 +34,19 @@ export async function runWorldOperation<T>(operation: () => Promise<T>): Promise
  * Läuft schon einer: 409. Die Sperre gilt, bis der Vorgang fertig ist.
  */
 export function startWorldOperation(
-  /** Welt, die geladen wird (Laden, Anlegen). `null`: kein Weltwechsel, z. B. ein Backup zurückspielen. */
+  /** Welt, die geladen wird (Laden, Anlegen). `null`: kein Weltwechsel, z. B. Backup zurückspielen, Minecraft-Update. */
   target: { place: number; world: string } | null,
   operation: () => Promise<void>
 ): void {
   claim();
   switching = target ? { ...target, phase: "countdown" } : null;
   operation()
-    .catch((error) => console.error(`Weltvorgang „${target?.world ?? "Backup"}“ fehlgeschlagen:`, error))
+    .catch((error) =>
+      console.error(
+        target ? `Weltvorgang „${target.world}“ fehlgeschlagen:` : "Weltvorgang fehlgeschlagen:",
+        error
+      )
+    )
     .finally(() => {
       running = false;
       switching = null;
@@ -52,18 +57,25 @@ const COUNTDOWN = [10, 5, 3, 2, 1];
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * Spielt jemand, zählt im Chat 10 s herunter, bevor der Server angehalten wird (Laden, Minecraft-Update).
+ * Spielt niemand, geht es sofort weiter. `text` bildet die Nachricht aus den verbleibenden Sekunden.
+ */
+export async function countdownInChat(text: (seconds: number) => string): Promise<void> {
+  const { players } = await bsm.summary();
+  if (players.length === 0) return;
+  const step = Number(useRuntimeConfig().countdownStepMs);
+  for (const [i, seconds] of COUNTDOWN.entries()) {
+    await bsm.sendCommand(`say ${text(seconds)}`);
+    await sleep((seconds - (COUNTDOWN[i + 1] ?? 0)) * step);
+  }
+}
+
+/**
  * Wechselt die aktive Welt: Spielt jemand, erst 10 s Countdown im Chat; sonst gleich. Dann die bisherige
  * Welt sichern (wenn eingestellt), Properties setzen und neu starten. BSM antwortet auf den Neustart erst, wenn der Server wieder läuft.
  */
 export async function switchWorld(worldName: string, properties: Record<string, string>): Promise<void> {
-  const { players } = await bsm.summary();
-  if (players.length > 0) {
-    const step = Number(useRuntimeConfig().countdownStepMs);
-    for (const [i, seconds] of COUNTDOWN.entries()) {
-      await bsm.sendCommand(`say Gleich geht es nach „${worldName}“! Neustart in ${seconds} s.`);
-      await sleep((seconds - (COUNTDOWN[i + 1] ?? 0)) * step);
-    }
-  }
+  await countdownInChat((seconds) => `Gleich geht es nach „${worldName}“! Neustart in ${seconds} s.`);
   // Die bisherige Welt sichern, mit dem letzten Stand direkt vor dem Neustart.
   if ((await readBackupSettings()).onWorldEnd) {
     if (switching) switching.phase = "backup";

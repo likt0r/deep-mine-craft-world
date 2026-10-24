@@ -3,4 +3,4 @@ Description=SMART-Werte der Systemplatte für Deep Mine Control
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/deep-mine-smart-status
+ExecStart=/usr/lib/deep-mine-control/bin/deep-mine-smart-status

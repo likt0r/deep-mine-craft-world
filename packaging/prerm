@@ -1,0 +1,16 @@
+#!/bin/sh
+# Beim Entfernen die Dienste stoppen und ausschalten. Bei einem Update nichts tun, postinst startet neu.
+set -e
+
+[ "$1" = remove ] || exit 0
+
+if [ -d /run/systemd/system ]; then
+  # Zuerst: Ist „Beim Herunterfahren sichern“ an, sichert das die aktive Welt, solange Deep Mine Control und BSM laufen.
+  systemctl stop deep-mine-backup-on-shutdown.service || true
+  systemctl stop deep-mine-smart.timer deep-mine-wifi-check.timer deep-mine-update-check.timer deep-mine-ethernet.path \
+    deep-mine-control.service bsm.service || true
+fi
+systemctl disable --quiet bsm.service deep-mine-control.service deep-mine-smart.timer deep-mine-wifi-check.timer deep-mine-update-check.timer \
+  deep-mine-ethernet.path deep-mine-backup-on-shutdown.service 2>/dev/null || true
+
+exit 0

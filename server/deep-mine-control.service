@@ -14,7 +14,7 @@ Environment=HOST=127.0.0.1
 Environment=PORT=3000
 # Enthält NUXT_BSM_PASSWORD für das BSM-Konto deep-mine-control.
 EnvironmentFile=/etc/deep-mine-control.env
-ExecStart=/usr/bin/node /opt/deep-mine-control/server/index.mjs
+ExecStart=/usr/bin/node /usr/lib/deep-mine-control/app/server/index.mjs
 Restart=on-failure
 RestartSec=5
 

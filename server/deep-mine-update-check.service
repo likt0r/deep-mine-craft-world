@@ -1,0 +1,8 @@
+[Unit]
+Description=Autoupdate: neue Versionen prüfen und installieren, wenn niemand spielt (Deep Mine Control)
+After=deep-mine-control.service
+
+[Service]
+Type=oneshot
+# Deep Mine Control entscheidet (Autoupdate an, niemand online, kein Weltvorgang) und antwortet sofort.
+ExecStart=/usr/bin/curl -fsS --max-time 60 -X POST http://127.0.0.1:3000/api/updates/auto

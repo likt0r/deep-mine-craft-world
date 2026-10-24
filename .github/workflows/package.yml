@@ -1,0 +1,63 @@
+# Baut das Paket deep-mine-control und prüft Dateiliste und Abhängigkeiten.
+# Bei PRs und auf main als Probe (Version 0.0.0); der Release-Workflow ruft ihn mit Version und Tag auf
+# und hängt das Artefakt ans Release.
+name: Paket
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+    inputs:
+      version:
+        description: Paketversion X.Y.Z
+        type: string
+        required: true
+      ref:
+        description: Stand, aus dem gebaut wird (z. B. der Tag vX.Y.Z); leer heißt der aufrufende Stand
+        type: string
+        default: ""
+    outputs:
+      artifact:
+        description: Name des Artefakts mit .deb und .deb.sha256
+        value: ${{ jobs.deb.outputs.artifact }}
+
+permissions:
+  contents: read
+
+jobs:
+  deb:
+    runs-on: ubuntu-24.04
+    outputs:
+      artifact: deep-mine-control-deb
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || '' }}
+
+      # Node 22 wie auf dem Server, npm 11 für die package-lock.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: control/package-lock.json
+      - run: npm install -g npm@11
+
+      - run: npm ci --no-audit --no-fund
+        working-directory: control
+
+      - name: Paket bauen
+        run: packaging/build-deb.sh "${VERSION:-0.0.0}"
+        env:
+          VERSION: ${{ inputs.version }}
+
+      - name: Paket prüfen
+        run: packaging/check-deb.sh dist/*.deb
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: deep-mine-control-deb
+          path: |
+            dist/*.deb
+            dist/*.deb.sha256
+          if-no-files-found: error

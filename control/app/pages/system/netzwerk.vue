@@ -70,7 +70,7 @@ async function setOffline(value: boolean) {
       variant="subtle"
       icon="i-lucide-wifi-off"
       title="WLAN-Verwaltung antwortet nicht"
-      description="NetworkManager läuft auf dem Server nicht oder ist nicht eingerichtet (install.sh)."
+      description="NetworkManager läuft auf dem Server nicht oder ist nicht eingerichtet (Paket deep-mine-control)."
       data-testid="wifi-error"
     />
 

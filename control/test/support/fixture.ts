@@ -22,6 +22,8 @@ export interface ServerFixture {
   /** WLAN an/aus und Markierung des Rettungsmodus (sonst /var/lib/... und /run) */
   wifiSettings: string;
   wifiRescue: string;
+  /** Versionsdatei wie im Paket. reset() schreibt FIXTURE_VERSION hinein. */
+  versionFile: string;
   /** Alles leeren und mit einer einzigen Welt neu anlegen. */
   reset(levelName?: string): void;
   addWorld(folder: string): void;
@@ -31,6 +33,7 @@ export interface ServerFixture {
 }
 
 export const DEFAULT_LEVEL_NAME = "Bedrock level";
+export const FIXTURE_VERSION = { version: "1.2.3", commit: "0123456789abcdef0123456789abcdef01234567" };
 
 export function createServerFixture(root = mkdtempSync(join(tmpdir(), "dmc-"))): ServerFixture {
   const serverDir = join(root, "servers", "Bedrock");
@@ -49,6 +52,7 @@ export function createServerFixture(root = mkdtempSync(join(tmpdir(), "dmc-"))):
     nmcliState: join(root, "nmcli.json"),
     wifiSettings: join(root, "deep-mine-control", "wifi.json"),
     wifiRescue: join(root, "deep-mine-wifi-rescue"),
+    versionFile: join(root, "version.json"),
     reset(levelName = DEFAULT_LEVEL_NAME) {
       for (const dir of [
         fixture.serverDir,
@@ -65,6 +69,7 @@ export function createServerFixture(root = mkdtempSync(join(tmpdir(), "dmc-"))):
       rmSync(fixture.nmcliState, { force: true });
       rmSync(`${fixture.nmcliState}.calls`, { force: true });
       rmSync(fixture.wifiRescue, { force: true });
+      writeFileSync(fixture.versionFile, JSON.stringify(FIXTURE_VERSION));
     },
     addWorld(folder) {
       mkdirSync(join(fixture.worldsDir, folder, "db"), { recursive: true });

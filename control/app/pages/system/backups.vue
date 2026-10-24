@@ -138,7 +138,7 @@ const downloadUrl = (file: string) => `/api/backups/download/${encodeURIComponen
         startet.
       </p>
       <p v-if="info?.autoBackup === null" class="text-sm text-warning" data-testid="backups-auto-unknown">
-        Dafür braucht das BSM-Konto deep-mine-control Admin-Rechte (richtet install.sh ein).
+        Dafür braucht das BSM-Konto deep-mine-control Admin-Rechte (richtet das Paket ein).
       </p>
       <UButton
         icon="i-lucide-save"

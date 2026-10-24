@@ -2,16 +2,21 @@
 	auto_https disable_redirects
 }
 
-# HOST_IP ersetzt install.sh durch die IP des Servers. 10.42.0.1 ist der Server im eigenen WLAN (AP).
+# Ohne feste Adresse: Caddy antwortet unter jeder IP des Servers (Kabel, eigenes WLAN 10.42.0.1, VPN) und localhost.
+# Liegt im Paket unter /usr/lib/deep-mine-control/Caddyfile, caddy.service liest sie über ein Drop-in
+# (server/caddy-deep-mine-control.conf). /etc/caddy/Caddyfile bleibt unbenutzt.
 
-# BSM (Admin, mit Anmeldung)
-https://HOST_IP, https://10.42.0.1, https://localhost {
-	tls internal
+# BSM (Admin, mit Anmeldung). Das Zertifikat stellt die interne CA von Caddy beim ersten Aufruf einer Adresse aus
+# („on demand“). Ohne SNI (Aufruf über die IP) nimmt Caddy die lokale IP der Verbindung. Für die interne CA
+# verlangt Caddy keine Erlaubnisabfrage (ask), sie belastet keine öffentliche CA.
+:443 {
+	tls internal {
+		on_demand
+	}
 	reverse_proxy 127.0.0.1:11325
 }
 
-# Deep Mine Control (Tablet, ohne Anmeldung, nur im LAN): unter jeder Adresse, also auch im eigenen WLAN
-# und nach einem Wechsel der IP-Adresse.
+# Deep Mine Control (Tablet, ohne Anmeldung, nur im LAN)
 :80 {
 	reverse_proxy 127.0.0.1:3000
 }

@@ -7,6 +7,7 @@ useHead({
 useSeoMeta({ title: "Deep Mine Control" });
 
 useStatusPolling();
+useUpdatesPolling();
 </script>
 
 <template>
