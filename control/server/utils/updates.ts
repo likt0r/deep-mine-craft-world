@@ -294,26 +294,64 @@ export async function updateMinecraft(version: string): Promise<void> {
   await writeFailed("minecraft", null);
 }
 
+/** Lage für den Autoupdate-Lauf, einmal gelesen für beide Teile */
+interface AutoUpdateScene {
+  updates: UpdatesInfo;
+  /** `null`: BSM antwortet nicht, also unbekannt, ob jemand spielt */
+  players: number | null;
+  updating: UpdateKind | null;
+}
+
 /**
- * Autoupdate-Lauf (stündlich vom Timer deep-mine-update-check): prüft neu und startet das Minecraft-Update im
- * Hintergrund, wenn Autoupdate an ist, eine neuere Version da ist, die nicht schon gescheitert ist, niemand
- * spielt und kein Weltvorgang läuft. Antwortet sofort mit dem, was getan wurde, oder warum nicht.
+ * Warum Autoupdate `kind` jetzt nicht aktualisiert, `null`: es darf. Ohne await, damit zwischen der Prüfung
+ * auf Weltvorgänge und dem Start nichts dazwischenkommt.
+ */
+function autoUpdateSkip(
+  kind: UpdateKind,
+  { updates, players, updating }: AutoUpdateScene
+): AutoUpdateSkip | null {
+  const info = updates[kind];
+  if (!updates.auto[kind]) return "off";
+  if (updates.errors[kind] || !info.current) return "check-failed";
+  if (!info.available || !info.latest) return "up-to-date";
+  if (info.failed) return "failed";
+  if (players === null) return "check-failed";
+  if (players > 0) return "players-online";
+  if (updating) return "update-running";
+  if (isWorldOperationRunning()) return "world-operation";
+  return null;
+}
+
+/**
+ * Autoupdate-Lauf (stündlich vom Timer deep-mine-update-check): prüft neu und startet höchstens ein Update,
+ * erst Minecraft, dann Deep Mine Control (das startet die App neu). Jeweils nur, wenn Autoupdate dafür an ist,
+ * eine neuere Version da ist, die nicht schon gescheitert ist, niemand spielt und weder ein Update noch ein
+ * Weltvorgang läuft. Startet Minecraft, ist Deep Mine Control erst im nächsten Lauf dran: Dann sind alle
+ * Bedingungen frisch geprüft. Antwortet sofort mit dem, was getan wurde, und warum der Rest nicht.
  */
 export async function runAutoUpdate(): Promise<AutoUpdateResult> {
   await checkNow();
-  if (!(await readAutoUpdateSettings()).minecraft) return { action: "none", reason: "off" };
+  const [updates, summary, updating] = await Promise.all([
+    readUpdates(),
+    bsm.summary().catch(() => null),
+    updatingNow()
+  ]);
+  const scene: AutoUpdateScene = { updates, players: summary?.players.length ?? null, updating };
 
-  const { minecraft, errors } = await readUpdates();
-  if (errors.minecraft || !minecraft.current) return { action: "none", reason: "check-failed" };
-  if (!minecraft.available || !minecraft.latest) return { action: "none", reason: "up-to-date" };
-  if (minecraft.failed) return { action: "none", reason: "failed" };
-  const summary = await bsm.summary().catch(() => null);
-  if (!summary) return { action: "none", reason: "check-failed" };
-  if (summary.players.length > 0) return { action: "none", reason: "players-online" };
-  // Direkt vor dem Start, ohne await dazwischen: Sonst könnte noch ein Weltvorgang dazwischenkommen.
-  if (isWorldOperationRunning()) return { action: "none", reason: "world-operation" };
+  const minecraft = autoUpdateSkip("minecraft", scene);
+  if (!minecraft) {
+    const version = updates.minecraft.latest!;
+    startWorldOperation(null, () => updateMinecraft(version));
+    return {
+      action: "minecraft",
+      version,
+      reasons: { control: autoUpdateSkip("control", { ...scene, updating: "minecraft" }) ?? "update-running" }
+    };
+  }
 
-  const version = minecraft.latest;
-  startWorldOperation(null, () => updateMinecraft(version));
-  return { action: "minecraft", version };
+  const control = autoUpdateSkip("control", scene);
+  if (control) return { action: "none", reasons: { minecraft, control } };
+  const version = updates.control.latest!;
+  await requestControlUpdate(version);
+  return { action: "control", version, reasons: { minecraft } };
 }

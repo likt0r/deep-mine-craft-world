@@ -280,3 +280,50 @@ test("ändert sich die Version im Status, lädt die Seite von selbst neu", async
   expect(await page.evaluate(() => (window as unknown as { vorher?: boolean }).vorher)).toBeUndefined();
   await expect(page.getByTestId("updates-control-uptodate")).toBeVisible();
 });
+
+test("Deep Mine Control: Autoupdate-Schalter zeigt den Hinweis statt des Knopfs", async ({ page }) => {
+  await offerControl(page, CONTROL_NEWER);
+  await page.goto("/system/updates");
+  const auto = page.getByTestId("update-auto-control");
+  await expect(auto).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByTestId("updates-control-update")).toBeVisible();
+  await expect(page.getByTestId("updates-control-auto-hint")).toBeHidden();
+
+  await auto.click();
+
+  await expect(toast(page, "Deep Mine Control wird automatisch aktualisiert.")).toBeVisible();
+  await expect(auto).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("updates-control-auto-hint")).toHaveText(
+    "Wird automatisch installiert, sobald niemand spielt."
+  );
+  await expect(page.getByTestId("updates-control-update")).toBeHidden();
+  // Der Minecraft-Schalter bleibt, wie er war.
+  await expect(page.getByTestId("update-auto-minecraft")).toHaveAttribute("aria-checked", "false");
+  expect(JSON.parse(readFileSync(join(DATA, "update-settings.json"), "utf8"))).toEqual({
+    control: true,
+    minecraft: false
+  });
+
+  await auto.click();
+
+  await expect(toast(page, "Deep Mine Control wird nicht mehr automatisch aktualisiert.")).toBeVisible();
+  await expect(auto).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByTestId("updates-control-update")).toBeVisible();
+});
+
+test("Deep Mine Control: Autoupdate an, Version gescheitert: Grund und „Erneut versuchen“", async ({
+  page
+}) => {
+  await page.request.put("/api/updates/auto", { data: { control: true } });
+  await offerControl(page, CONTROL_NEWER);
+  helperState("failed", "Prüfsumme stimmt nicht.");
+  await page.goto("/system/updates");
+
+  const failed = page.getByTestId("updates-control-failed");
+  await expect(failed).toContainText(`Update auf ${CONTROL_NEWER} ist fehlgeschlagen`);
+  await expect(failed).toContainText(
+    "Prüfsumme stimmt nicht. Automatisch wird es nicht noch einmal versucht."
+  );
+  await expect(page.getByTestId("updates-control-auto-hint")).toBeHidden();
+  await expect(page.getByTestId("updates-control-update")).toContainText("Erneut versuchen");
+});

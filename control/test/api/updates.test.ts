@@ -240,7 +240,7 @@ describe("POST /api/updates/auto", () => {
   it("Autoupdate aus: prüft trotzdem, installiert aber nichts", async () => {
     h.fake.state.latestVersion = NEWER;
 
-    expect(await autoRun()).toEqual({ action: "none", reason: "off" });
+    expect(await autoRun()).toEqual({ action: "none", reasons: { minecraft: "off", control: "off" } });
 
     expect((await h.request("/api/updates")).body.minecraft).toMatchObject({
       latest: NEWER,
@@ -254,7 +254,7 @@ describe("POST /api/updates/auto", () => {
     h.fake.state.latestVersion = NEWER;
     h.fake.state.startDelayMs = 500;
 
-    expect(await autoRun()).toEqual({ action: "minecraft", version: NEWER });
+    expect(await autoRun()).toEqual({ action: "minecraft", version: NEWER, reasons: { control: "off" } });
 
     expect(await status()).toMatchObject({ busy: true, updating: "minecraft" });
     await expect.poll(notBusy).toBe(false);
@@ -269,7 +269,7 @@ describe("POST /api/updates/auto", () => {
   it("an, aber nichts neu: nichts", async () => {
     await autoOn();
 
-    expect(await autoRun()).toEqual({ action: "none", reason: "up-to-date" });
+    expect(await autoRun()).toEqual({ action: "none", reasons: { minecraft: "up-to-date", control: "off" } });
     expect(updateCalls()).toEqual([]);
   });
 
@@ -277,7 +277,10 @@ describe("POST /api/updates/auto", () => {
     await autoOn();
     h.fake.state.mojangDown = true;
 
-    expect(await autoRun()).toEqual({ action: "none", reason: "check-failed" });
+    expect(await autoRun()).toEqual({
+      action: "none",
+      reasons: { minecraft: "check-failed", control: "off" }
+    });
     expect(updateCalls()).toEqual([]);
   });
 
@@ -286,7 +289,10 @@ describe("POST /api/updates/auto", () => {
     await offer(NEWER);
     h.fake.state.players = ["Lena"];
 
-    expect(await autoRun()).toEqual({ action: "none", reason: "players-online" });
+    expect(await autoRun()).toEqual({
+      action: "none",
+      reasons: { minecraft: "players-online", control: "off" }
+    });
     expect(updateCalls()).toEqual([]);
     expect(h.fake.commands()).toEqual([]);
   });
@@ -299,7 +305,10 @@ describe("POST /api/updates/auto", () => {
     h.fake.state.startDelayMs = 500;
     await h.request("/api/places/2/load", { method: "POST" });
 
-    expect(await autoRun()).toEqual({ action: "none", reason: "world-operation" });
+    expect(await autoRun()).toEqual({
+      action: "none",
+      reasons: { minecraft: "world-operation", control: "off" }
+    });
 
     await expect.poll(notBusy).toBe(false);
     expect(updateCalls()).toEqual([]);
@@ -309,17 +318,17 @@ describe("POST /api/updates/auto", () => {
     await autoOn();
     await offer(NEWER);
     h.fake.state.tasksFail = true;
-    expect(await autoRun()).toEqual({ action: "minecraft", version: NEWER });
+    expect(await autoRun()).toMatchObject({ action: "minecraft", version: NEWER });
     await expect.poll(notBusy).toBe(false);
     expect((await h.request("/api/updates")).body.minecraft.failed).toBe(NEWER);
 
     h.fake.state.tasksFail = false;
-    expect(await autoRun()).toEqual({ action: "none", reason: "failed" });
+    expect(await autoRun()).toEqual({ action: "none", reasons: { minecraft: "failed", control: "off" } });
     expect(updateCalls()).toHaveLength(1);
 
     // Eine noch neuere Version versucht Autoupdate wieder.
     h.fake.state.latestVersion = "1.26.70.2";
-    expect(await autoRun()).toEqual({ action: "minecraft", version: "1.26.70.2" });
+    expect(await autoRun()).toMatchObject({ action: "minecraft", version: "1.26.70.2" });
     await expect.poll(notBusy).toBe(false);
     expect(updateCalls()).toHaveLength(2);
     expect((await h.request("/api/updates")).body.minecraft).toMatchObject({
@@ -337,7 +346,7 @@ describe("POST /api/updates/auto", () => {
     await offer(NEWER);
 
     expect((await h.request("/api/updates")).body.minecraft.failed).toBe(NEWER);
-    expect(await autoRun()).toEqual({ action: "none", reason: "failed" });
+    expect(await autoRun()).toEqual({ action: "none", reasons: { minecraft: "failed", control: "off" } });
     expect(updateCalls()).toEqual([]);
 
     expect((await h.request("/api/updates/minecraft", { method: "POST" })).status).toBe(200);
@@ -590,5 +599,144 @@ describe("Deep Mine Control: Stand des Updates", () => {
       kind: "control",
       phase: "failed"
     });
+  });
+});
+
+describe("Deep Mine Control: Autoupdate", () => {
+  const autoRun = async () => {
+    const res = await h.request("/api/updates/auto", { method: "POST" });
+    expect(res.status).toBe(200);
+    return res.body;
+  };
+  const autoOn = (body: { control?: boolean; minecraft?: boolean }) =>
+    h.request("/api/updates/auto", { method: "PUT", body });
+  const requested = () => existsSync(dataFile("update-request.json"));
+
+  it("Schalter für Deep Mine Control: gespeichert, Minecraft bleibt aus", async () => {
+    const res = await autoOn({ control: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ control: true, minecraft: false });
+    expect(readJson("update-settings.json")).toEqual({ control: true, minecraft: false });
+    expect((await h.request("/api/updates")).body.auto).toEqual({ control: true, minecraft: false });
+  });
+
+  it("aus: prüft, schreibt aber keine Anfrage", async () => {
+    h.fake.state.controlLatest = CONTROL_NEWER;
+
+    expect(await autoRun()).toEqual({ action: "none", reasons: { minecraft: "off", control: "off" } });
+    expect((await h.request("/api/updates")).body.control).toMatchObject({ available: true });
+    expect(requested()).toBe(false);
+  });
+
+  it("nur Deep Mine Control neu, niemand online: Anfrage für den root-Helfer geschrieben", async () => {
+    await autoOn({ control: true, minecraft: true });
+    h.fake.state.controlLatest = CONTROL_NEWER;
+
+    expect(await autoRun()).toEqual({
+      action: "control",
+      version: CONTROL_NEWER,
+      reasons: { minecraft: "up-to-date" }
+    });
+
+    expect(readJson("update-request.json")).toEqual({ id: expect.any(String), version: CONTROL_NEWER });
+    expect(await status()).toMatchObject({ updating: "control", busy: true });
+    // Der nächste Lauf startet nichts, solange das Update läuft.
+    expect(await autoRun()).toEqual({
+      action: "none",
+      reasons: { minecraft: "up-to-date", control: "update-running" }
+    });
+  });
+
+  it("beide neu: erst Minecraft; Deep Mine Control kommt im nächsten Lauf", async () => {
+    await autoOn({ control: true, minecraft: true });
+    h.fake.state.latestVersion = NEWER;
+    h.fake.state.controlLatest = CONTROL_NEWER;
+    h.fake.state.startDelayMs = 500;
+
+    expect(await autoRun()).toEqual({
+      action: "minecraft",
+      version: NEWER,
+      reasons: { control: "update-running" }
+    });
+    expect(requested()).toBe(false);
+    // Solange Minecraft aktualisiert wird, startet kein Lauf etwas.
+    expect(await autoRun()).toEqual({
+      action: "none",
+      reasons: { minecraft: "update-running", control: "update-running" }
+    });
+
+    await expect.poll(notBusy).toBe(false);
+    expect(requested()).toBe(false);
+    expect(await autoRun()).toEqual({
+      action: "control",
+      version: CONTROL_NEWER,
+      reasons: { minecraft: "up-to-date" }
+    });
+    expect(readJson("update-request.json")).toMatchObject({ version: CONTROL_NEWER });
+    expect(updateCalls()).toHaveLength(1);
+  });
+
+  it("jemand spielt: nichts, weder Minecraft noch Deep Mine Control", async () => {
+    await autoOn({ control: true, minecraft: true });
+    h.fake.state.latestVersion = NEWER;
+    h.fake.state.controlLatest = CONTROL_NEWER;
+    h.fake.state.players = ["Lena"];
+
+    expect(await autoRun()).toEqual({
+      action: "none",
+      reasons: { minecraft: "players-online", control: "players-online" }
+    });
+    expect(requested()).toBe(false);
+    expect(updateCalls()).toEqual([]);
+    expect(h.fake.commands()).toEqual([]);
+  });
+
+  it("ein Weltvorgang läuft: keine Anfrage", async () => {
+    await h.request("/api/places");
+    h.fixture.seedPlace(2, { name: "Bauwelt", folder: "w-bauwelt" });
+    await autoOn({ control: true });
+    h.fake.state.controlLatest = CONTROL_NEWER;
+    h.fake.state.startDelayMs = 500;
+    await h.request("/api/places/2/load", { method: "POST" });
+
+    expect(await autoRun()).toEqual({
+      action: "none",
+      reasons: { minecraft: "off", control: "world-operation" }
+    });
+
+    await expect.poll(notBusy).toBe(false);
+    expect(requested()).toBe(false);
+  });
+
+  it("gescheiterte Version: übersprungen; eine neuere versucht Autoupdate wieder", async () => {
+    await autoOn({ control: true });
+    await offerControl(CONTROL_NEWER);
+    helperState("rolled-back", { error: "kaputt", finishedAt: new Date().toISOString() });
+
+    expect(await autoRun()).toEqual({ action: "none", reasons: { minecraft: "off", control: "failed" } });
+    expect(requested()).toBe(false);
+
+    h.fake.state.controlLatest = "1.4.0";
+    expect(await autoRun()).toEqual({
+      action: "control",
+      version: "1.4.0",
+      reasons: { minecraft: "off" }
+    });
+    expect(readJson("update-request.json")).toMatchObject({ version: "1.4.0" });
+  });
+
+  it("solange Deep Mine Control aktualisiert wird, startet auch kein Minecraft-Autoupdate", async () => {
+    await autoOn({ control: true, minecraft: true });
+    h.fake.state.latestVersion = NEWER;
+    h.fake.state.controlLatest = CONTROL_NEWER;
+    helperState("installing");
+
+    expect(await autoRun()).toEqual({
+      action: "none",
+      reasons: { minecraft: "update-running", control: "update-running" }
+    });
+    expect(updateCalls()).toEqual([]);
+    expect(await status()).toMatchObject({ busy: true, updating: "control" });
   });
 });

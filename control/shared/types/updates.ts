@@ -38,7 +38,7 @@ export interface UpdateRun {
   error: string | null;
 }
 
-/** Autoupdate je Teil an oder aus, Standard beide aus. Den Schalter für „control“ zeigt die Seite noch nicht. */
+/** Autoupdate je Teil an oder aus, Standard beide aus. */
 export interface AutoUpdateSettings {
   control: boolean;
   minecraft: boolean;
@@ -63,20 +63,29 @@ export interface UpdatesInfo {
 }
 
 /**
- * Warum der Autoupdate-Lauf nichts installiert hat (stabile Schlüssel, z. B. für Logs):
- * - `off`: Autoupdate ist aus
- * - `check-failed`: neueste oder installierte Version unbekannt (Mojang oder BSM nicht erreichbar)
- * - `up-to-date`: nichts neu
+ * Warum der Autoupdate-Lauf einen Teil nicht aktualisiert hat (stabile Schlüssel, z. B. für Logs):
+ * - `off`: Autoupdate ist für diesen Teil aus
+ * - `check-failed`: neueste oder installierte Version unbekannt, oder wer spielt (GitHub, Mojang oder BSM
+ *   nicht erreichbar)
+ * - `up-to-date`: nichts neu (auch: Deep Mine Control ohne Paket, „dev“)
  * - `failed`: das Update auf die neueste Version ist schon gescheitert, nur der Knopf versucht es erneut
  * - `players-online`: jemand spielt
- * - `world-operation`: gerade läuft ein Weltvorgang (auch ein Update)
+ * - `update-running`: gerade läuft ein Update (Deep Mine Control oder Minecraft, auch eins, das dieser Lauf
+ *   gerade gestartet hat)
+ * - `world-operation`: gerade läuft ein Weltvorgang
  */
 export type AutoUpdateSkip =
-  "off" | "check-failed" | "up-to-date" | "failed" | "players-online" | "world-operation";
+  "off" | "check-failed" | "up-to-date" | "failed" | "players-online" | "update-running" | "world-operation";
 
 /**
- * Ergebnis von `POST /api/updates/auto`. `minecraft`: Das Update auf `version` läuft jetzt im Hintergrund
- * (wie per Knopf). `none`: nichts gestartet, `reason` sagt warum.
+ * Ergebnis von `POST /api/updates/auto`. Ein Lauf startet höchstens ein Update, Minecraft vor Deep Mine
+ * Control (das startet die App neu). Startet Minecraft, kommt Deep Mine Control frühestens im nächsten Lauf.
+ * - `minecraft`: Das Minecraft-Update auf `version` läuft jetzt im Hintergrund (wie per Knopf).
+ * - `control`: Die Anfrage für Deep Mine Control auf `version` ist geschrieben, der root-Helfer übernimmt.
+ * - `none`: nichts gestartet.
+ * `reasons` sagt für jeden Teil, der nicht gestartet wurde, warum.
  */
 export type AutoUpdateResult =
-  { action: "none"; reason: AutoUpdateSkip } | { action: "minecraft"; version: string };
+  | { action: "none"; reasons: Record<UpdateKind, AutoUpdateSkip> }
+  | { action: "minecraft"; version: string; reasons: { control: AutoUpdateSkip } }
+  | { action: "control"; version: string; reasons: { minecraft: AutoUpdateSkip } };

@@ -53,25 +53,33 @@ async function checkNow() {
   }
 }
 
-const switchingAuto = ref(false);
-async function setAutoMinecraft(minecraft: boolean) {
-  switchingAuto.value = true;
+const AUTO_DONE: Record<UpdateKind, Record<"on" | "off", string>> = {
+  control: {
+    on: "Deep Mine Control wird automatisch aktualisiert.",
+    off: "Deep Mine Control wird nicht mehr automatisch aktualisiert."
+  },
+  minecraft: {
+    on: "Minecraft wird automatisch aktualisiert.",
+    off: "Minecraft wird nicht mehr automatisch aktualisiert."
+  }
+};
+/** Welcher Schalter gerade gespeichert wird */
+const switchingAuto = ref<UpdateKind | null>(null);
+async function setAuto(kind: UpdateKind, on: boolean) {
+  switchingAuto.value = kind;
   try {
-    await $fetch("/api/updates/auto", { method: "PUT", body: { minecraft } });
-    feedback.done(
-      minecraft
-        ? "Minecraft wird automatisch aktualisiert."
-        : "Minecraft wird nicht mehr automatisch aktualisiert."
-    );
+    await $fetch("/api/updates/auto", { method: "PUT", body: { [kind]: on } });
+    feedback.done(AUTO_DONE[kind][on ? "on" : "off"]);
     await refresh();
   } catch {
     feedback.failed();
   } finally {
-    switchingAuto.value = false;
+    switchingAuto.value = null;
   }
 }
 /** Bei Autoupdate gibt es statt des Knopfs einen Hinweis. Eine gescheiterte Version versucht nur der Knopf erneut. */
 const showUpdateButton = computed(() => !info.value?.auto.minecraft || !!minecraft.value?.failed);
+const showControlButton = computed(() => !info.value?.auto.control || !!control.value?.failed);
 
 async function updateMinecraft() {
   try {
@@ -133,25 +141,39 @@ async function updateMinecraft() {
           variant="subtle"
           icon="i-lucide-circle-alert"
           :title="`Update auf ${control.failed} ist fehlgeschlagen`"
-          :description="controlRun?.error ?? undefined"
+          :description="
+            info?.auto.control
+              ? `${controlRun?.error ? controlRun.error + ' ' : ''}Automatisch wird es nicht noch einmal versucht.`
+              : (controlRun?.error ?? undefined)
+          "
           data-testid="updates-control-failed"
         />
         <p class="text-toned" data-testid="updates-control-available">
           <strong class="text-highlighted">Version {{ control.latest }}</strong> ist da.
         </p>
-        <p class="text-sm text-muted">
-          Deep Mine Control startet dabei neu, die Seite lädt danach von selbst. Minecraft läuft weiter,
-          niemand wird getrennt.
+        <p
+          v-if="!showControlButton"
+          class="flex items-center gap-2 font-semibold text-highlighted"
+          data-testid="updates-control-auto-hint"
+        >
+          <UIcon name="i-lucide-clock" class="size-5 shrink-0" />
+          Wird automatisch installiert, sobald niemand spielt.
         </p>
-        <HoldButton
-          :label="control.failed ? 'Erneut versuchen' : 'Jetzt aktualisieren'"
-          icon="i-lucide-download"
-          color="warning"
-          :disabled="controlLocked"
-          data-testid="updates-control-update"
-          @confirm="updateControl"
-        />
-        <p class="text-center text-sm text-muted">3 Sekunden gedrückt halten.</p>
+        <template v-else>
+          <p class="text-sm text-muted">
+            Deep Mine Control startet dabei neu, die Seite lädt danach von selbst. Minecraft läuft weiter,
+            niemand wird getrennt.
+          </p>
+          <HoldButton
+            :label="control.failed ? 'Erneut versuchen' : 'Jetzt aktualisieren'"
+            icon="i-lucide-download"
+            color="warning"
+            :disabled="controlLocked"
+            data-testid="updates-control-update"
+            @confirm="updateControl"
+          />
+          <p class="text-center text-sm text-muted">3 Sekunden gedrückt halten.</p>
+        </template>
       </template>
 
       <p v-else-if="control?.latest && control.current === 'dev'" class="text-sm text-muted">
@@ -189,6 +211,23 @@ async function updateMinecraft() {
           {{ control.notes }}
         </p>
       </details>
+
+      <div class="flex items-center gap-3 border-t border-default pt-3">
+        <span id="auto-control-label" class="flex-1 font-semibold">Automatisch aktualisieren</span>
+        <USwitch
+          size="xl"
+          aria-labelledby="auto-control-label"
+          :modelValue="info?.auto.control ?? false"
+          :loading="switchingAuto === 'control'"
+          :disabled="!!switchingAuto || !info"
+          data-testid="update-auto-control"
+          @update:modelValue="(on: boolean) => setAuto('control', on)"
+        />
+      </div>
+      <p class="text-sm text-muted">
+        Jede Stunde wird geprüft. Eine neue Version wird nur installiert, wenn gerade niemand spielt, und erst
+        nach einem neuen Minecraft.
+      </p>
     </SystemCard>
 
     <SystemCard title="Minecraft-Server" icon="i-lucide-pickaxe" data-testid="updates-minecraft">
@@ -293,10 +332,10 @@ async function updateMinecraft() {
           size="xl"
           aria-labelledby="auto-minecraft-label"
           :modelValue="info?.auto.minecraft ?? false"
-          :loading="switchingAuto"
-          :disabled="switchingAuto || !info"
+          :loading="switchingAuto === 'minecraft'"
+          :disabled="!!switchingAuto || !info"
           data-testid="update-auto-minecraft"
-          @update:modelValue="setAutoMinecraft"
+          @update:modelValue="(on: boolean) => setAuto('minecraft', on)"
         />
       </div>
       <p class="text-sm text-muted">
