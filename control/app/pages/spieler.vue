@@ -17,6 +17,62 @@ const online = computed(() => players.value.filter((p) => p.online));
 const whitelisted = computed(() => players.value.filter((p) => !p.online && p.whitelisted));
 const seen = computed(() => players.value.filter((p) => !p.online && !p.whitelisted));
 
+const closed = computed(() => data.value?.closed ?? false);
+const newPlayers = computed(() => data.value?.newPlayers ?? "member");
+const unlistedOnline = computed(() => (data.value?.players ?? []).filter((p) => p.online && !p.whitelisted));
+const accessBusy = ref(false);
+const askClose = ref(false);
+
+type AccessBody = {
+  closed?: boolean;
+  newPlayers?: "visitor" | "member";
+  onlineNotListed?: "whitelist" | "kick";
+};
+
+async function setAccess(body: AccessBody) {
+  accessBusy.value = true;
+  try {
+    await $fetch("/api/players/access", { method: "PUT", body });
+    askClose.value = false;
+    await refresh();
+    if (body.closed !== undefined)
+      feedback.done(body.closed ? "Zugang ist geschlossen." : "Zugang ist offen.");
+    else if (body.newPlayers) {
+      feedback.done(
+        body.newPlayers === "visitor" ? "Neue Spieler sind Besucher." : "Neue Spieler sind Mitglieder."
+      );
+    }
+  } catch (error) {
+    // Der Server hat inzwischen einen Spieler ohne Eintrag gesehen: dann erst nachfragen.
+    if (
+      !body.onlineNotListed &&
+      body.closed === true &&
+      (error as { statusCode?: number }).statusCode === 409
+    ) {
+      await refresh();
+      askClose.value = true;
+    } else {
+      feedback.failed();
+    }
+  } finally {
+    accessBusy.value = false;
+  }
+}
+
+function chooseClosed(value: boolean) {
+  // Beim Schließen erst fragen, wenn jemand online ist, der nicht auf der Whitelist steht.
+  if (value && unlistedOnline.value.length > 0) {
+    askClose.value = true;
+    return;
+  }
+  void setAccess({ closed: value });
+}
+
+function chooseNewPlayers(value: "visitor" | "member") {
+  if (value === newPlayers.value) return;
+  void setAccess({ newPlayers: value });
+}
+
 const GAMERTAG = /^[A-Za-z0-9 ]{1,16}(#\d{1,4})?$/;
 const newName = ref("");
 const busy = ref<string | null>(null);
@@ -46,6 +102,76 @@ async function add() {
 <template>
   <UContainer class="flex flex-col gap-5 py-5 lg:max-w-3xl">
     <h1 class="font-pixel text-3xl font-bold text-highlighted">Spieler</h1>
+
+    <UAlert
+      v-if="data?.offlineMode"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-triangle-alert"
+      title="Offline-Modus ist an"
+      description="Whitelist und Sperren lassen sich umgehen."
+      data-testid="players-offline"
+    />
+
+    <SystemCard title="Zugang" icon="i-lucide-door-closed" data-testid="players-access">
+      <div class="grid grid-cols-2 gap-2">
+        <UButton
+          :color="!closed ? 'primary' : 'neutral'"
+          :variant="!closed ? 'solid' : 'subtle'"
+          :aria-pressed="!closed"
+          :disabled="accessBusy"
+          class="block-btn h-12 font-semibold"
+          data-testid="access-open"
+          @click="chooseClosed(false)"
+        >
+          Offen
+        </UButton>
+        <UButton
+          :color="closed ? 'primary' : 'neutral'"
+          :variant="closed ? 'solid' : 'subtle'"
+          :aria-pressed="closed"
+          :disabled="accessBusy"
+          class="block-btn h-12 font-semibold"
+          data-testid="access-closed"
+          @click="chooseClosed(true)"
+        >
+          Geschlossen
+        </UButton>
+      </div>
+      <p class="text-sm text-muted" data-testid="access-explanation">
+        {{
+          closed
+            ? "Nur Spieler auf der Whitelist können beitreten."
+            : "Jeder kann beitreten, außer gesperrten Spielern."
+        }}
+      </p>
+
+      <p id="new-players-label" class="mt-1 font-semibold">Neue Spieler sind:</p>
+      <div class="grid grid-cols-2 gap-2" aria-labelledby="new-players-label">
+        <UButton
+          :color="newPlayers === 'visitor' ? 'primary' : 'neutral'"
+          :variant="newPlayers === 'visitor' ? 'solid' : 'subtle'"
+          :aria-pressed="newPlayers === 'visitor'"
+          :disabled="accessBusy"
+          class="block-btn h-12 font-semibold"
+          data-testid="access-new-visitor"
+          @click="chooseNewPlayers('visitor')"
+        >
+          Besucher
+        </UButton>
+        <UButton
+          :color="newPlayers === 'member' ? 'primary' : 'neutral'"
+          :variant="newPlayers === 'member' ? 'solid' : 'subtle'"
+          :aria-pressed="newPlayers === 'member'"
+          :disabled="accessBusy"
+          class="block-btn h-12 font-semibold"
+          data-testid="access-new-member"
+          @click="chooseNewPlayers('member')"
+        >
+          Mitglied
+        </UButton>
+      </div>
+    </SystemCard>
 
     <SystemCard title="Zur Whitelist hinzufügen" icon="i-lucide-user-plus" data-testid="whitelist-add">
       <p class="text-sm text-muted">Geht auch für Freunde, die noch nie da waren.</p>
@@ -144,5 +270,55 @@ async function add() {
         </PlayerRow>
       </ul>
     </details>
+
+    <UDrawer
+      v-model:open="askClose"
+      handleOnly
+      title="Zugang schließen"
+      :ui="{
+        content: 'bg-muted',
+        container: 'mx-auto w-full max-w-lg pb-[calc(1rem+env(safe-area-inset-bottom))]'
+      }"
+    >
+      <template #body>
+        <div class="flex flex-col gap-3" data-testid="access-close-dialog">
+          <p>
+            Diese Spieler sind online und stehen nicht auf der Whitelist:
+            <strong>{{ unlistedOnline.map((p) => p.name).join(", ") }}</strong>
+          </p>
+          <UButton
+            icon="i-lucide-user-plus"
+            size="lg"
+            class="block-btn font-semibold"
+            :loading="accessBusy"
+            data-testid="access-close-whitelist"
+            @click="setAccess({ closed: true, onlineNotListed: 'whitelist' })"
+          >
+            Mit auf die Whitelist
+          </UButton>
+          <UButton
+            icon="i-lucide-log-out"
+            color="error"
+            size="lg"
+            class="block-btn font-semibold"
+            :loading="accessBusy"
+            data-testid="access-close-kick"
+            @click="setAccess({ closed: true, onlineNotListed: 'kick' })"
+          >
+            Kicken
+          </UButton>
+          <UButton
+            color="neutral"
+            variant="ghost"
+            size="lg"
+            class="block-btn"
+            data-testid="access-close-cancel"
+            @click="askClose = false"
+          >
+            Abbrechen
+          </UButton>
+        </div>
+      </template>
+    </UDrawer>
   </UContainer>
 </template>

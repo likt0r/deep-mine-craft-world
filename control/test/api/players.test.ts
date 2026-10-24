@@ -39,6 +39,131 @@ describe("GET /api/players", () => {
 
     expect(res.body.players).toEqual([{ name: "Neu", xuid: "1000", online: true, whitelisted: false }]);
   });
+
+  it("meldet standardmäßig offenen Zugang, Mitglieder und keinen Offline-Modus", async () => {
+    const res = await h.request("/api/players");
+
+    expect(res.body).toMatchObject({ closed: false, newPlayers: "member", offlineMode: false });
+  });
+
+  it("liest Zugang, Recht für neue Spieler und Offline-Modus aus den Eigenschaften", async () => {
+    h.fake.state.properties["allow-list"] = "true";
+    h.fake.state.properties["default-player-permission-level"] = "visitor";
+    h.fake.state.properties["online-mode"] = "false";
+
+    const res = await h.request("/api/players");
+
+    expect(res.body).toMatchObject({ closed: true, newPlayers: "visitor", offlineMode: true });
+  });
+
+  it("meldet Operator für neue Spieler als Mitglied", async () => {
+    h.fake.state.properties["default-player-permission-level"] = "operator";
+
+    const res = await h.request("/api/players");
+
+    expect(res.body.newPlayers).toBe("member");
+  });
+});
+
+describe("PUT /api/players/access", () => {
+  it("schließt den Zugang bei gestopptem Server nur in den Eigenschaften", async () => {
+    h.fake.state.status = "STOPPED";
+
+    const res = await h.request("/api/players/access", { method: "PUT", body: { closed: true } });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true });
+    expect(h.fake.state.properties["allow-list"]).toBe("true");
+    expect(h.fake.commands()).toEqual([]);
+  });
+
+  it("schließt den Zugang am laufenden Server zusätzlich mit allowlist on", async () => {
+    const res = await h.request("/api/players/access", { method: "PUT", body: { closed: true } });
+
+    expect(res.status).toBe(200);
+    expect(h.fake.state.properties["allow-list"]).toBe("true");
+    expect(h.fake.commands()).toEqual(["allowlist on"]);
+  });
+
+  it("öffnet den Zugang am laufenden Server mit allowlist off", async () => {
+    h.fake.state.properties["allow-list"] = "true";
+
+    const res = await h.request("/api/players/access", { method: "PUT", body: { closed: false } });
+
+    expect(res.status).toBe(200);
+    expect(h.fake.state.properties["allow-list"]).toBe("false");
+    expect(h.fake.commands()).toEqual(["allowlist off"]);
+  });
+
+  it.each(["visitor", "member"] as const)("setzt neue Spieler auf %s", async (newPlayers) => {
+    const res = await h.request("/api/players/access", { method: "PUT", body: { newPlayers } });
+
+    expect(res.status).toBe(200);
+    expect(h.fake.state.properties["default-player-permission-level"]).toBe(newPlayers);
+    expect(h.fake.commands()).toEqual([]);
+  });
+
+  it("lehnt Operator für neue Spieler ab und ändert nichts", async () => {
+    const res = await h.request("/api/players/access", {
+      method: "PUT",
+      body: { newPlayers: "operator" }
+    });
+
+    expect(res.status).toBe(400);
+    expect(h.fake.state.properties["default-player-permission-level"]).toBeUndefined();
+    expect(h.fake.commands()).toEqual([]);
+  });
+
+  it("verlangt Zugang oder Recht für neue Spieler", async () => {
+    const res = await h.request("/api/players/access", { method: "PUT", body: {} });
+
+    expect(res.status).toBe(400);
+    expect(h.fake.commands()).toEqual([]);
+  });
+
+  it("fragt beim Schließen mit Online-Spielern ohne Whitelist nach und ändert nichts", async () => {
+    h.fake.state.players = ["Lena"];
+    h.fake.state.allowlist = [whitelistEntry("Tom")];
+
+    const res = await h.request("/api/players/access", { method: "PUT", body: { closed: true } });
+
+    expect(res.status).toBe(409);
+    expect(res.body.message).toContain("Lena");
+    expect(h.fake.state.properties["allow-list"]).toBeUndefined();
+    expect(h.fake.state.allowlist).toEqual([whitelistEntry("Tom")]);
+    expect(h.fake.state.players).toEqual(["Lena"]);
+    expect(h.fake.commands()).toEqual([]);
+  });
+
+  it("schließt den Zugang und setzt Online-Spieler ohne Whitelist auf die Whitelist", async () => {
+    h.fake.state.players = ["Lena", "Ben"];
+    h.fake.state.allowlist = [whitelistEntry("Lena")];
+
+    const res = await h.request("/api/players/access", {
+      method: "PUT",
+      body: { closed: true, onlineNotListed: "whitelist" }
+    });
+
+    expect(res.status).toBe(200);
+    expect(h.fake.state.allowlist).toEqual([whitelistEntry("Lena"), whitelistEntry("Ben")]);
+    expect(h.fake.state.properties["allow-list"]).toBe("true");
+    expect(h.fake.commands()).toEqual(["allowlist reload", "allowlist on"]);
+  });
+
+  it("schließt den Zugang und kickt Online-Spieler ohne Whitelist", async () => {
+    h.fake.state.players = ["Lena", "Ben"];
+    h.fake.state.allowlist = [whitelistEntry("Lena")];
+
+    const res = await h.request("/api/players/access", {
+      method: "PUT",
+      body: { closed: true, onlineNotListed: "kick" }
+    });
+
+    expect(res.status).toBe(200);
+    expect(h.fake.state.players).toEqual(["Lena"]);
+    expect(h.fake.state.properties["allow-list"]).toBe("true");
+    expect(h.fake.commands()).toEqual(['kick "Ben" Der Server ist jetzt geschlossen.', "allowlist on"]);
+  });
 });
 
 describe("POST /api/players/whitelist", () => {

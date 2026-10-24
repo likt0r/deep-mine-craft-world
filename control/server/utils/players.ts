@@ -11,7 +11,12 @@ export const gamertag = z
 
 /** Online-Spieler, bekannte Spieler und Whitelist als eine Liste. Gleiche Gamertags in anderer Schreibweise sind ein Spieler. */
 export async function readPlayers(): Promise<PlayersInfo> {
-  const [summary, known, allowlist] = await Promise.all([bsm.summary(), bsm.knownPlayers(), bsm.allowlist()]);
+  const [summary, known, allowlist, properties] = await Promise.all([
+    bsm.summary(),
+    bsm.knownPlayers(),
+    bsm.allowlist(),
+    bsm.getProperties()
+  ]);
   const byName = new Map<string, PlayerInfo>();
   // Wer zuerst eingetragen wird, bestimmt die Schreibweise: erst aus dem Spiel, dann aus den Logs, dann von der Whitelist.
   const entry = (name: string, xuid?: string | null) => {
@@ -28,7 +33,13 @@ export async function readPlayers(): Promise<PlayersInfo> {
   const players = [...byName.values()].sort(
     (a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name, "de")
   );
-  return { players };
+  return {
+    closed: properties["allow-list"] === "true",
+    // Operator ist für neue Spieler bewusst nicht wählbar.
+    newPlayers: properties["default-player-permission-level"] === "visitor" ? "visitor" : "member",
+    offlineMode: properties["online-mode"] === "false",
+    players
+  };
 }
 
 /** Schickt einen `… reload`, damit der laufende Server geänderte Listen liest. Gestoppt liest er sie beim Start. */

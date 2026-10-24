@@ -75,3 +75,64 @@ test("ab 11 Spielern gibt es eine Suche, sie öffnet auch die früheren Spieler"
   await expect(page.getByTestId("player-row")).toHaveCount(1);
   await expect(page.getByTestId("player-row")).toHaveAttribute("data-player", "Greta");
 });
+
+test("Zugang schließen und wieder öffnen", async ({ page }) => {
+  await page.goto("/spieler");
+  const open = page.getByTestId("access-open");
+  const closed = page.getByTestId("access-closed");
+  await expect(open).toHaveAttribute("aria-pressed", "true");
+
+  await closed.click();
+  await expect(toast(page, "Zugang ist geschlossen.")).toBeVisible();
+  await expect(closed).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("access-explanation")).toHaveText(
+    "Nur Spieler auf der Whitelist können beitreten."
+  );
+  expect((await fake.get()).properties["allow-list"]).toBe("true");
+  expect(await fake.commands()).toEqual(["allowlist on"]);
+
+  await open.click();
+  await expect(toast(page, "Zugang ist offen.")).toBeVisible();
+  await expect(open).toHaveAttribute("aria-pressed", "true");
+  expect((await fake.get()).properties["allow-list"]).toBe("false");
+  expect(await fake.commands()).toEqual(["allowlist on", "allowlist off"]);
+});
+
+test("beim Schließen mit Online-Spieler ohne Whitelist fragt ein Dialog", async ({ page }) => {
+  await fake.set({ players: ["Lena"], allowlist: [whitelistEntry("Ben")] });
+  await page.goto("/spieler");
+
+  await page.getByTestId("access-closed").click();
+
+  const dialog = page.getByTestId("access-close-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("Lena");
+  await dialog.getByTestId("access-close-whitelist").click();
+
+  await expect(toast(page, "Zugang ist geschlossen.")).toBeVisible();
+  await expect(dialog).toBeHidden();
+  const state = await fake.get();
+  expect(state.allowlist.map((entry) => entry.name)).toContain("Lena");
+  expect(state.properties["allow-list"]).toBe("true");
+  expect(await fake.commands()).toEqual(["allowlist reload", "allowlist on"]);
+});
+
+test("neue Spieler auf Besucher stellen", async ({ page }) => {
+  await page.goto("/spieler");
+  await expect(page.getByTestId("access-new-member")).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByTestId("access-new-visitor").click();
+
+  await expect(toast(page, "Neue Spieler sind Besucher.")).toBeVisible();
+  await expect(page.getByTestId("access-new-visitor")).toHaveAttribute("aria-pressed", "true");
+  expect((await fake.get()).properties["default-player-permission-level"]).toBe("visitor");
+});
+
+test("weist oben auf den Offline-Modus hin", async ({ page }) => {
+  await fake.set({ properties: { "online-mode": "false" } });
+  await page.goto("/spieler");
+
+  const hint = page.getByTestId("players-offline");
+  await expect(hint).toContainText("Offline-Modus ist an");
+  await expect(hint).toContainText("Whitelist und Sperren lassen sich umgehen.");
+});

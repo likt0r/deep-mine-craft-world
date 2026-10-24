@@ -9,6 +9,12 @@ export interface PlayerInfo {
 }
 
 export interface PlayersInfo {
+  /** `allow-list`: Nur Spieler auf der Whitelist können beitreten */
+  closed: boolean;
+  /** Recht für neue Spieler; Operator wird als Mitglied gemeldet */
+  newPlayers: "visitor" | "member";
+  /** `online-mode=false`: Whitelist und Sperren lassen sich umgehen */
+  offlineMode: boolean;
   /** Online zuerst, dann nach Name */
   players: PlayerInfo[];
 }
