@@ -33,3 +33,8 @@ export function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / 1024 / 1024).toLocaleString("de-DE", { maximumFractionDigits: 1 })} MB`;
 }
+
+/** ISO-Zeitpunkt (auch ohne Zeitzone) → „24.10.2026“ */
+export function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("de-DE");
+}

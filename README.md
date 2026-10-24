@@ -37,18 +37,21 @@ In BSM beim Server `Bedrock`:
 
 - `gamemode=creative`, `force-gamemode=true` (alle spielen kreativ, fliegen per Doppelsprung)
 - Autostart und Auto-Update an (Konsolen und Handys aktualisieren sich selbst, der Server muss mitziehen)
-- Seit BDS 26.30 ist `allow-list=true` voreingestellt: Spieler unter „Access Control“ → „Allowlist“ eintragen
+- Seit BDS 26.30 ist `allow-list=true` voreingestellt: Spieler in Deep Mine Control unter **Spieler** auf die Whitelist setzen
 
 BSM behält 3 Backups je Welt und 3 heruntergeladene Bedrock-Versionen. „Vor jedem Start sichern“ (BSM-Plugin
 `backup_on_start`) lässt sich in Deep Mine Control unter **System → Backups** schalten.
 
 ## Deep Mine Control
 
-Die Tablet-Oberfläche unter http://192.168.0.110 hat vier Bereiche (Handy: Tabs unten, Tablet: Leiste links):
+Die Tablet-Oberfläche unter http://192.168.0.110 hat fünf Bereiche (Handy: Tabs unten, Tablet: Leiste links):
 
 - **Spielen:** aktive Welt mit Status, Spieler („Alle hierher“), Spielmodus, Schwierigkeit, Zeit und Wetter
 - **Welten:** 10 Plätze für Welten (anlegen, laden, umbenennen, löschen durch 3 s Halten)
 - **Regeln:** die Spielregeln der aktiven Welt
+- **Spieler:** Zugang offen oder geschlossen, Recht für neue Spieler, Whitelist; pro Spieler Recht
+  (Besucher, Mitglied, Operator), kicken, sperren mit Grund und entsperren. Sperren setzt BSM durch: Wer gesperrt
+  ist, wird bei jedem Beitreten gekickt. Sperren und Rechte gehen erst, wenn der Spieler einmal da war (Xbox-ID).
 - **System:** CPU-Temperatur und -Last, Arbeitsspeicher, Platte, SSD-Zustand, Laufzeiten, letzte Sicherung;
   Minecraft neu starten oder stoppen, Rechner neu starten oder ausschalten (jeweils 3 s halten).
   Unter **System → Netzwerk**: Ethernet (DHCP oder feste IP), VPN (WireGuard), hinterlegte WLANs, das eigene WLAN (AP) mit Passwort
@@ -218,8 +221,6 @@ Kopien ab (`/etc/systemd/system/bsm.service` und `deep-mine-*`, `/usr/local/bin/
 ## Nützliche Konsolenbefehle (BSM → Konsole, ohne `/`)
 
 ```
-allowlist add Gamertag        # Spieler reinlassen
-op Gamertag                   # Spieler zum Operator machen
 time set day                  # Tag
 gamerule dodaylightcycle false  # Zeit anhalten
 gamerule keepinventory true   # Sachen beim Sterben behalten

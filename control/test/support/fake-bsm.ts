@@ -25,6 +25,14 @@ export interface FakeState {
   /** BSM-Status: RUNNING, STARTING, STOPPED, … */
   status: string;
   players: string[];
+  /** Spieler aus den Server-Logs (`/api/players/get`). Online-Spieler kommen wie bei BSM von selbst dazu. */
+  knownPlayers: { name: string; xuid: string }[];
+  /** allowlist.json */
+  allowlist: { name: string; xuid: string | null; ignoresPlayerLimit: boolean }[];
+  /** Gesperrte Spieler (`bans/get`). BSM kickt sie selbst bei jedem Spielerscan, das spielt der Fake nicht nach. */
+  bans: { player_name: string; xuid: string; reason: string | null; banned_at: string | null }[];
+  /** permissions.json */
+  permissions: { xuid: string; name: string; permission_level: "visitor" | "member" | "operator" }[];
   properties: Record<string, string>;
   /**
    * Spielregeln, die auf `gamerule` ohne Argumente in die Server-Ausgabe geschrieben werden,
@@ -85,6 +93,10 @@ function initialState(): FakeState {
   return {
     status: "RUNNING",
     players: [],
+    knownPlayers: [],
+    allowlist: [],
+    bans: [],
+    permissions: [],
     properties: {
       "level-name": DEFAULT_LEVEL_NAME,
       gamemode: "creative",
@@ -149,6 +161,15 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
     expireTokens: () => tokens.clear(),
     close: () => new Promise((resolve) => server.close(() => resolve()))
   };
+
+  /** XUID eines Spielers. Wer online ist, landet wie bei BSM in den bekannten Spielern (erster 1000, dann 1001, …). */
+  function xuidOf(name: string): string {
+    const known = fake.state.knownPlayers.find((k) => k.name.toLowerCase() === name.toLowerCase());
+    if (known) return known.xuid;
+    const xuid = String(1000 + fake.state.knownPlayers.length);
+    fake.state.knownPlayers.push({ name, xuid });
+    return xuid;
+  }
 
   /**
    * Aufgaben (Backup, Restore, Update). Erst „running“, dann fertig – oder gescheitert, wenn `tasksFail`.
@@ -312,6 +333,11 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
       return send(res, 200, { status: "success", message: "ok" });
     }
 
+    if (path === "/api/players/get" && req.method === "GET") {
+      fake.state.players.forEach(xuidOf);
+      return send(res, 200, { status: "success", message: null, players: fake.state.knownPlayers });
+    }
+
     const prefix = `/api/server/${SERVER}/`;
     if (!path.startsWith(prefix)) return bsmError(res, 404, "not_found", "Not Found");
     const action = `${req.method} ${path.slice(prefix.length)}`;
@@ -324,8 +350,64 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
           version: fake.state.version,
           players_available: true,
           player_count: fake.state.players.length,
-          players: fake.state.players.map((name, i) => ({ name, xuid: String(1000 + i) }))
+          players: fake.state.players.map((name) => ({ name, xuid: xuidOf(name) }))
         });
+      case "GET allowlist/get":
+        return send(res, 200, { status: "success", message: null, players: fake.state.allowlist });
+      case "POST allowlist/add": {
+        const players = (body as { players?: string[] } | null)?.players ?? [];
+        for (const p of players) {
+          if (!fake.state.allowlist.some((a) => a.name.toLowerCase() === p.toLowerCase())) {
+            fake.state.allowlist.push({ name: p, xuid: null, ignoresPlayerLimit: false });
+          }
+        }
+        return send(res, 200, { status: "success", message: "ok", added_count: players.length });
+      }
+      case "DELETE allowlist/remove": {
+        const players = (body as { players?: string[] } | null)?.players ?? [];
+        const removed: string[] = [];
+        const not_found: string[] = [];
+        for (const p of players) {
+          const idx = fake.state.allowlist.findIndex((a) => a.name.toLowerCase() === p.toLowerCase());
+          if (idx >= 0) {
+            removed.push(fake.state.allowlist[idx]!.name);
+            fake.state.allowlist.splice(idx, 1);
+          } else {
+            not_found.push(p);
+          }
+        }
+        return send(res, 200, { status: "success", message: "ok", details: { removed, not_found } });
+      }
+      case "GET bans/get":
+        return send(res, 200, { status: "success", message: null, bans: fake.state.bans });
+      case "POST bans/add": {
+        const ban = body as { player_name?: string; xuid?: string; reason?: string | null } | null;
+        if (!ban?.player_name || !ban.xuid)
+          return bsmError(res, 422, "validation_error", "API data failed validation.");
+        // Wie BSM: Zeitpunkt ohne Zeitzone, eine Sperre je XUID.
+        const entry = {
+          player_name: ban.player_name,
+          xuid: ban.xuid,
+          reason: ban.reason ?? null,
+          banned_at: new Date().toISOString().slice(0, 19)
+        };
+        fake.state.bans = [...fake.state.bans.filter((b) => b.xuid !== ban.xuid), entry];
+        return send(res, 200, {
+          status: "success",
+          message: `Player '${ban.player_name}' banned.`,
+          server_name: SERVER
+        });
+      }
+      case "DELETE bans/remove": {
+        const xuid = (body as { xuid?: string } | null)?.xuid;
+        if (!xuid) return bsmError(res, 422, "validation_error", "API data failed validation.");
+        fake.state.bans = fake.state.bans.filter((b) => b.xuid !== xuid);
+        return send(res, 200, {
+          status: "success",
+          message: `XUID '${xuid}' unbanned.`,
+          server_name: SERVER
+        });
+      }
       case "POST backup/action": {
         // Wie BSM: <Ordner der aktiven Welt>_backup_<Zeit>_<hex>.mcworld im Backup-Ordner.
         const level = fake.state.properties["level-name"] ?? "";
@@ -371,6 +453,9 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
           if (fake.state.outputDelayMs > 0) setTimeout(write, fake.state.outputDelayMs);
           else write();
         }
+        // Wie BDS: `kick "<Gamertag>" <Nachricht>` wirft den Spieler aus dem Spiel.
+        const kicked = command.match(/^kick "([^"]+)"/)?.[1]?.toLowerCase();
+        if (kicked) fake.state.players = fake.state.players.filter((p) => p.toLowerCase() !== kicked);
         return send(res, 200, {
           status: "success",
           server_name: SERVER,
@@ -385,6 +470,35 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
         if (!properties) return bsmError(res, 422, "validation_error", "API data failed validation.");
         Object.assign(fake.state.properties, properties);
         return send(res, 200, { status: "success", server_name: SERVER, message: "ok" });
+      }
+      case "GET permissions/get":
+        return send(res, 200, { status: "success", message: null, permissions: fake.state.permissions });
+      case "POST permissions/set": {
+        const permissions =
+          (
+            body as {
+              permissions?: Array<{
+                xuid: string;
+                name: string;
+                permission_level: "visitor" | "member" | "operator";
+              }>;
+            } | null
+          )?.permissions ?? [];
+        const outcomes: Record<string, { outcome: "completed" }> = {};
+        for (const p of permissions) {
+          const idx = fake.state.permissions.findIndex((a) => a.xuid === p.xuid);
+          if (idx >= 0) {
+            fake.state.permissions[idx] = {
+              xuid: p.xuid,
+              name: p.name,
+              permission_level: p.permission_level
+            };
+          } else {
+            fake.state.permissions.push({ xuid: p.xuid, name: p.name, permission_level: p.permission_level });
+          }
+          outcomes[p.xuid] = { outcome: "completed" };
+        }
+        return send(res, 200, { status: "success", message: "ok", updated: permissions.length, outcomes });
       }
       default:
         return bsmError(res, 404, "not_found", "Not Found");

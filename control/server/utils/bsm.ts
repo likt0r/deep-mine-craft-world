@@ -42,7 +42,10 @@ function freshLogin() {
 }
 
 /** Ruft die BSM-API auf. Bei 401 einmal neu anmelden und wiederholen. */
-async function bsmFetch<T>(path: string, options: { method?: "GET" | "POST"; body?: object } = {}) {
+async function bsmFetch<T>(
+  path: string,
+  options: { method?: "GET" | "POST" | "DELETE"; body?: object } = {}
+) {
   const { bsmUrl } = useRuntimeConfig();
   const call = (current: string) =>
     $fetch<T>(path, {
@@ -105,5 +108,40 @@ export const bsm = {
     bsmFetch(`/api/plugins/${encodeURIComponent(name)}`, { method: "POST", body: { enabled } }),
   /** Schreibt nur server.properties. Wirksam wird es erst nach `restart()`. */
   setProperties: (properties: Record<string, string>) =>
-    bsmFetch(serverPath("properties/set"), { method: "POST", body: { properties } })
+    bsmFetch(serverPath("properties/set"), { method: "POST", body: { properties } }),
+  /** Whitelist aus allowlist.json. `xuid` steht dort erst, wenn der Spieler einmal da war. */
+  allowlist: () =>
+    bsmFetch<{ players: { name: string; xuid?: string | null }[] }>(serverPath("allowlist/get")).then(
+      (r) => r.players
+    ),
+  /** Schreibt nur allowlist.json. Der laufende Server liest sie erst nach `allowlist reload`. */
+  allowlistAdd: (name: string) =>
+    bsmFetch(serverPath("allowlist/add"), {
+      method: "POST",
+      body: { players: [name], ignoresPlayerLimit: false }
+    }),
+  allowlistRemove: (name: string) =>
+    bsmFetch(serverPath("allowlist/remove"), { method: "DELETE", body: { players: [name] } }),
+  /** Gesperrte Spieler. BSM kickt sie bei jedem Spielerscan. `banned_at` ohne Zeitzone, z. B. „2026-10-24T12:00:00“. */
+  bans: () =>
+    bsmFetch<{
+      bans: { player_name: string; xuid: string; reason: string | null; banned_at: string | null }[];
+    }>(serverPath("bans/get")).then((r) => r.bans),
+  ban: (name: string, xuid: string, reason: string | null) =>
+    bsmFetch(serverPath("bans/add"), { method: "POST", body: { player_name: name, xuid, reason } }),
+  unban: (xuid: string) => bsmFetch(serverPath("bans/remove"), { method: "DELETE", body: { xuid } }),
+  /** Alle Spieler, die BSM je in den Server-Logs gesehen hat, mit XUID. */
+  knownPlayers: () =>
+    bsmFetch<{ players: { name: string; xuid: string }[] }>("/api/players/get").then((r) => r.players),
+  /** Rechte aus permissions.json. */
+  permissions: () =>
+    bsmFetch<{
+      permissions: { xuid: string; name: string; permission_level: Permission }[];
+    }>(serverPath("permissions/get")).then((r) => r.permissions),
+  /** Setzt den Eintrag dieser XUID in permissions.json. Der laufende Server liest sie erst nach `permission reload`. */
+  setPermission: (xuid: string, name: string, level: Permission) =>
+    bsmFetch(serverPath("permissions/set"), {
+      method: "POST",
+      body: { permissions: [{ xuid, name, permission_level: level }] }
+    })
 };

@@ -6,6 +6,7 @@ const AREAS = [
   { to: "/", label: "Spielen", icon: "i-lucide-gamepad-2" },
   { to: "/welten", label: "Welten", icon: "i-lucide-layers" },
   { to: "/regeln", label: "Regeln", icon: "i-lucide-toggle-right" },
+  { to: "/spieler", label: "Spieler", icon: "i-lucide-users" },
   { to: "/system", label: "System", icon: "i-lucide-activity" }
 ];
 </script>
@@ -15,7 +16,7 @@ const AREAS = [
   <nav
     aria-label="Bereiche"
     data-testid="app-nav"
-    class="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-default bg-muted pb-[env(safe-area-inset-bottom)] md:inset-y-0 md:right-auto md:flex md:w-28 md:flex-col md:gap-2 md:border-t-0 md:border-r md:px-3 md:py-5"
+    class="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-default bg-muted pb-[env(safe-area-inset-bottom)] md:inset-y-0 md:right-auto md:flex md:w-28 md:flex-col md:gap-2 md:border-t-0 md:border-r md:px-3 md:py-5"
   >
     <div aria-hidden="true" class="grass-block mx-auto mb-4 hidden size-13 md:block" />
     <NuxtLink
