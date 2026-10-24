@@ -14,10 +14,26 @@
   --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
   /* Pixel-Schrift für Überschriften und Tab-Beschriftungen */
   --font-pixel: "Pixelify Sans", ui-sans-serif, sans-serif;
+
+  /* Grün wie die Knöpfe auf minecraft.net: 500 Fläche, 600 Hover, 700 Unterkante, 400 Oberkante */
+  --color-grass-50: #eef8e9;
+  --color-grass-100: #d8efcd;
+  --color-grass-200: #b4dfa0;
+  --color-grass-300: #86c96a;
+  --color-grass-400: #52a535;
+  --color-grass-500: #3c8527;
+  --color-grass-600: #2a641c;
+  --color-grass-700: #1d4d13;
+  --color-grass-800: #173d10;
+  --color-grass-900: #12300d;
+  --color-grass-950: #0a1c07;
 }
 
 /* Dunkler Stein-Grund wie im Design: Seite stone-950, Karten stone-900, Flächen stone-800. */
 .dark {
+  /* Sonst nimmt Nuxt UI im Dark Mode Stufe 400, dann ist weiße Schrift auf Knöpfen kaum lesbar. */
+  --ui-primary: var(--ui-color-primary-500);
+  --ui-success: var(--ui-color-success-500);
   --ui-bg: var(--ui-color-neutral-950);
   --ui-bg-muted: var(--ui-color-neutral-900);
   --ui-bg-elevated: var(--ui-color-neutral-800);
@@ -30,25 +46,45 @@
 @layer components {
   /* Knöpfe wie Blöcke: dunkle Kante unten, beim Drücken sinkt der Block ein. */
   .block-btn {
-    box-shadow: inset 0 -4px 0 rgb(0 0 0 / 0.35);
+    border-radius: 2px;
+    box-shadow:
+      inset 0 2px 0 rgb(255 255 255 / 0.18),
+      inset 0 -4px 0 rgb(0 0 0 / 0.35),
+      0 0 0 2px #1e1e1f;
   }
   .block-btn:not(:disabled):active {
-    box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.35);
+    box-shadow:
+      inset 0 -1px 0 rgb(0 0 0 / 0.35),
+      0 0 0 2px #1e1e1f;
     transform: translateY(2px);
+  }
+
+  /* Toast wie eine Meldung im Spiel: dunkler Steinblock mit Kanten, Symbol in einem Farbblock. */
+  .mc-toast {
+    box-shadow:
+      0 0 0 2px #1e1e1f,
+      inset 0 2px 0 rgb(255 255 255 / 0.08),
+      inset 0 -4px 0 rgb(0 0 0 / 0.35),
+      0 6px 0 rgb(0 0 0 / 0.4);
+  }
+  .mc-toast-icon {
+    box-shadow:
+      inset 0 2px 0 rgb(255 255 255 / 0.2),
+      inset 0 -3px 0 rgb(0 0 0 / 0.35);
   }
 
   /* Gras- und Erdkante über der Karte der aktiven Welt */
   .grass-edge {
     height: 8px;
-    background-color: #22c55e;
+    background-color: var(--color-grass-500);
     background-image: linear-gradient(
       90deg,
-      #4ade80 0% 25%,
-      #16a34a 25% 32%,
-      #22c55e 32% 58%,
-      #4ade80 58% 80%,
-      #16a34a 80% 86%,
-      #22c55e 86% 100%
+      var(--color-grass-400) 0% 25%,
+      var(--color-grass-600) 25% 32%,
+      var(--color-grass-500) 32% 58%,
+      var(--color-grass-400) 58% 80%,
+      var(--color-grass-600) 80% 86%,
+      var(--color-grass-500) 86% 100%
     );
     background-size: 48px 8px;
   }
@@ -86,7 +122,7 @@
     border-radius: 8px;
     background-color: #92400e;
     background-image:
-      linear-gradient(180deg, #4ade80 0% 22%, #22c55e 22% 34%, transparent 34%),
+      linear-gradient(180deg, var(--color-grass-400) 0% 22%, var(--color-grass-500) 22% 34%, transparent 34%),
       linear-gradient(90deg, transparent 0% 20%, #78350f 20% 32%, transparent 32% 64%, #a16207 64% 74%, transparent 74%);
     box-shadow: inset 0 -5px 0 rgb(0 0 0 / 0.3);
   }

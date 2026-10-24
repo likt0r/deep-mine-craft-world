@@ -38,7 +38,7 @@ function requestLoad(entry: Place) {
         <span
           aria-hidden="true"
           class="flex size-9 shrink-0 items-center justify-center rounded-md font-pixel font-bold text-neutral-950 shadow-[inset_0_-3px_0_rgb(0_0_0/0.3)]"
-          :class="entry.world!.type === 'flach' ? 'bg-amber-400' : 'bg-green-400'"
+          :class="entry.world!.type === 'flach' ? 'bg-amber-400' : 'bg-grass-400'"
         >
           {{ entry.place }}
         </span>
