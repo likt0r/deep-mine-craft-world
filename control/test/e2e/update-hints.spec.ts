@@ -1,7 +1,15 @@
+import { readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { expect, test, type Page } from "@playwright/test";
 
 import { fake } from "./fake";
+import { E2E_APP_PORT } from "./ports";
 import { toast } from "./toast";
+
+const ROOT = fileURLToPath(new URL(`../../.data/e2e-${E2E_APP_PORT}`, import.meta.url));
+const DATA = join(ROOT, "deep-mine-control");
 
 const INSTALLED = "1.26.52.3";
 const NEWER = "1.26.60.1";
@@ -94,4 +102,26 @@ test("Autoupdate an: Hinweis ohne Knopf", async ({ page }) => {
   await expect(page.getByTestId("update-hint-update")).toBeHidden();
   // Die Einstellung liegt in der App, nicht im Fake: für die übrigen Tests wieder aus.
   await page.request.put("/api/updates/auto", { data: { minecraft: false } });
+});
+
+test("Deep Mine Control: Hinweis, Halten schreibt die Anfrage für den Helfer", async ({ page }) => {
+  await fake.set({ controlLatest: "1.3.0" });
+  await page.request.post("/api/updates/check");
+  await page.goto("/");
+
+  const hint = page.locator('[data-testid="update-hint"][data-kind="control"]');
+  await expect(hint).toContainText("Neue Version: Deep Mine Control 1.3.0");
+  await hint.getByTestId("update-hint-update").click();
+  const sheet = page.getByTestId("update-hint-sheet");
+  await expect(sheet).toContainText("Im Spiel merkt niemand etwas.");
+
+  await page.getByTestId("update-hint-confirm").hover();
+  await page.mouse.down();
+  await page.waitForTimeout(3200);
+  await page.mouse.up();
+
+  await expect(toast(page, "Deep Mine Control 1.3.0 wird installiert …")).toBeVisible();
+  const request = JSON.parse(readFileSync(join(DATA, "update-request.json"), "utf8"));
+  expect(request.version).toBe("1.3.0");
+  rmSync(join(DATA, "update-request.json"));
 });

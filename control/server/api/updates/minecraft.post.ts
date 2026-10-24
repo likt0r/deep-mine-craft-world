@@ -8,6 +8,8 @@ export default defineEventHandler(async () => {
   const { minecraft } = await readUpdates();
   if (!minecraft.available || !minecraft.latest)
     throw createError({ statusCode: 409, message: "Kein Update verfügbar" });
+  if ((await updatingNow()) === "control")
+    throw createError({ statusCode: 409, message: "Deep Mine Control wird gerade aktualisiert" });
 
   const version = minecraft.latest;
   startWorldOperation(null, () => updateMinecraft(version));

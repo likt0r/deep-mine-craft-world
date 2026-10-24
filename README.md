@@ -132,12 +132,19 @@ registrieren, Passwort in die Datei schreiben, `sudo systemctl restart deep-mine
 
 ## Updates
 
-Unter System → Updates zeigt Deep Mine Control die installierte und die neueste Minecraft-Version (Mojang) und
-aktualisiert per Halten über BSM (stoppen, sichern, installieren, starten). **Autoupdate** (Schalter auf der Karte,
-Standard aus, `update-settings.json`): Der Timer `deep-mine-update-check` ruft stündlich (erstmals 10 Minuten
-nach dem Start) `POST /api/updates/auto` auf. Installiert wird nur, wenn niemand spielt und kein Weltvorgang läuft.
-Eine gescheiterte Version merkt sich `updates.json`; Autoupdate versucht sie nicht noch einmal, „Erneut versuchen“
-auf der Karte schon. Warum ein Lauf nichts getan hat: `journalctl -u deep-mine-update-check`.
+Unter System → Updates zeigt Deep Mine Control die installierte und die neueste Version von sich selbst
+(GitHub-Release mit Paket, samt Änderungsliste) und vom Minecraft-Server (Mojang). Aktualisiert wird per Halten:
+Minecraft über BSM (stoppen, sichern, installieren, starten), Deep Mine Control über den root-Helfer
+`deep-mine-update` (Paket laden, prüfen, installieren, bei Bedarf zurück zur vorigen Version). Das startet nur die
+Oberfläche neu, niemand wird aus dem Spiel getrennt.
+
+**Autoupdate** (je Karte ein Schalter, Standard aus, `update-settings.json`): Der Timer `deep-mine-update-check`
+ruft stündlich (erstmals 10 Minuten nach dem Start) `POST /api/updates/auto` auf. Installiert wird nur, wenn
+niemand spielt und weder ein Weltvorgang noch ein Update läuft. Ein Lauf startet höchstens ein Update, Minecraft
+vor Deep Mine Control (das startet die Oberfläche neu); sind beide neu, kommt Deep Mine Control im Lauf eine
+Stunde später dran. Eine gescheiterte Version merkt sich `updates.json`; Autoupdate versucht sie nicht noch
+einmal, „Erneut versuchen“ auf der Karte schon. Was ein Lauf getan hat und warum nicht mehr (`reasons` je Teil,
+z. B. `players-online`): `journalctl -u deep-mine-update-check`.
 
 ## Paket bauen
 

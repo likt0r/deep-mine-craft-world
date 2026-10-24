@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 
-import { DEFAULT_LEVEL_NAME, type ServerFixture } from "./fixture";
+import { DEFAULT_LEVEL_NAME, FIXTURE_VERSION, type ServerFixture } from "./fixture";
 
 /**
  * Nachgebautes BSM für Tests. Beantwortet nur die Routen, die Deep Mine Control nutzt,
@@ -13,7 +13,8 @@ import { DEFAULT_LEVEL_NAME, type ServerFixture } from "./fixture";
  * Steuerung von außen (für Playwright): GET/POST /__fake/state, POST /__fake/reset,
  * POST /__fake/expire-tokens, POST /__fake/seed-place ({ place, world }, siehe ServerFixture.seedPlace).
  *
- * Spielt außerdem die Download-Links von Mojang (GET /mojang/links, ohne Anmeldung).
+ * Spielt außerdem die Download-Links von Mojang (GET /mojang/links, ohne Anmeldung) und das neueste Release von
+ * Deep Mine Control auf GitHub (GET /github/repos/likt0r/deep-mine-craft-world/releases/latest).
  */
 
 export const FAKE_USER = "deep-mine-control";
@@ -53,6 +54,14 @@ export interface FakeState {
   latestVersion: string;
   /** Mojang ist nicht erreichbar (die Links antworten mit 503). */
   mojangDown: boolean;
+  /** Neuestes Release von Deep Mine Control auf GitHub (ohne „v“), Standard: die Version der Fixture */
+  controlLatest: string;
+  /** Änderungsliste des Release (body) */
+  controlNotes: string;
+  /** Das Paket hängt schon am Release. */
+  controlPackage: boolean;
+  /** GitHub ist nicht erreichbar (503). */
+  githubDown: boolean;
 }
 
 export interface FakeCall {
@@ -93,7 +102,12 @@ function initialState(): FakeState {
     tasksFail: false,
     version: "1.26.52.3",
     latestVersion: "1.26.52.3",
-    mojangDown: false
+    mojangDown: false,
+    controlLatest: FIXTURE_VERSION.version,
+    controlNotes:
+      "* Updates: Deep Mine Control per Knopf aktualisieren (abc1234)\n* Design: Grün wie in Minecraft (def5678)",
+    controlPackage: true,
+    githubDown: false
   };
 }
 
@@ -223,6 +237,30 @@ export async function startFakeBsm(fixture: ServerFixture, port = 0): Promise<Fa
             }
           ]
         }
+      });
+    }
+
+    // --- Neuestes Release auf GitHub (Auszug derselben Form, ohne Anmeldung) ---
+    if (path === "/github/repos/likt0r/deep-mine-craft-world/releases/latest" && req.method === "GET") {
+      if (fake.state.githubDown) return send(res, 503, { message: "Service Unavailable" });
+      const tag = `v${fake.state.controlLatest}`;
+      const deb = `deep-mine-control_${fake.state.controlLatest}_amd64.deb`;
+      const asset = (name: string, id: number) => ({
+        id,
+        name,
+        size: 1000,
+        browser_download_url: `https://github.com/likt0r/deep-mine-craft-world/releases/download/${tag}/${name}`
+      });
+      return send(res, 200, {
+        id: 1,
+        tag_name: tag,
+        name: tag,
+        draft: false,
+        prerelease: false,
+        created_at: "2026-10-24T08:00:00Z",
+        published_at: "2026-10-24T08:00:00Z",
+        body: fake.state.controlNotes,
+        assets: fake.state.controlPackage ? [asset(deb, 11), asset(`${deb}.sha256`, 12)] : []
       });
     }
 

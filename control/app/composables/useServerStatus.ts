@@ -1,10 +1,24 @@
 /**
  * Lädt alle 3 s Status und Plätze neu, egal in welchem Bereich man ist, solange die Seite sichtbar ist.
- * Nur einmal in der App aufrufen (app.vue).
+ * Ändert sich dabei die Version von Deep Mine Control, lädt die Seite neu. Nur einmal in der App aufrufen (app.vue).
  */
 export function useStatusPolling() {
-  const { refresh, error } = useFetch<Status>("/api/status", { key: "status" });
+  const { data, refresh, error } = useFetch<Status>("/api/status", { key: "status" });
   const connection = useConnection();
+
+  // Nach einem Update meldet Deep Mine Control eine andere Version: Seite neu laden, damit sie dazu passt.
+  if (import.meta.client) {
+    let first: string | undefined;
+    watch(
+      () => data.value?.version,
+      (version) => {
+        if (!version) return;
+        first ??= version;
+        if (version !== first) reloadNuxtApp();
+      },
+      { immediate: true }
+    );
+  }
 
   // Antwortet Deep Mine Control mit Grund „bsm“, läuft es, aber BSM nicht. Sonst ist die Verbindung weg.
   watch(

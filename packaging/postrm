@@ -11,6 +11,8 @@ case "$1" in
       # Ohne das Drop-in liest Caddy wieder /etc/caddy/Caddyfile.
       systemctl try-restart caddy.service || true
     fi
+    # Pakete für Updates und Rückfall (deep-mine-update) sind keine Daten.
+    if [ "$1" = purge ]; then rm -rf /var/cache/deep-mine-control; fi
     ;;
 esac
 

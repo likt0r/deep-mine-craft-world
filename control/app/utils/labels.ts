@@ -52,6 +52,9 @@ export function updatingLabel(kind: UpdateKind): string {
 const UPDATE_PHASES: Record<UpdateRun["phase"], string> = {
   countdown: "Countdown im Spiel",
   updating: "BSM sichert, installiert und startet neu",
+  downloading: "Wird geladen und geprüft",
+  installing: "Wird installiert",
+  verifying: "Wartet auf die neue Version",
   failed: "Fehlgeschlagen"
 };
 

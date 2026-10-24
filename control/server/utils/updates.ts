@@ -1,16 +1,26 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { z } from "zod";
 
-// Updates prüfen und ausführen. Das Ergebnis der Prüfung liegt nur im Speicher: Es wird beim ersten Abruf
-// geholt und, wenn es älter als eine Stunde ist, neu. „Jetzt prüfen“ holt es sofort.
+// Updates prüfen und ausführen. Das Ergebnis der Prüfung (GitHub und Mojang) liegt nur im Speicher: Es wird
+// beim ersten Abruf geholt und, wenn es älter als eine Stunde ist, neu. „Jetzt prüfen“ holt es sofort.
 // Dauerhaft im Datenordner liegen die Autoupdate-Schalter (update-settings.json) und gescheiterte Versionen
 // (updates.json).
+// Deep Mine Control aktualisiert der root-Helfer deep-mine-update (server/update.py): Deep Mine Control
+// schreibt nur die Anfrage (update-request.json) und liest den Stand (update-state.json).
 
 const CHECK_MAX_AGE_MS = 60 * 60 * 1000;
 /** BSM stoppt, sichert, lädt und installiert: Das dauert deutlich länger als ein Backup. */
 const MINECRAFT_UPDATE_TIMEOUT_MS = 15 * 60 * 1000;
+/** So lange gilt eine Anfrage als unterwegs, bis der Helfer sie abholt. Danach ist er wohl nicht da. */
+const CONTROL_REQUEST_MAX_AGE_MS = 60 * 1000;
+/** Länger dauert kein Control-Update. Steht der Stand dann noch auf „läuft“, war der Rechner wohl aus. */
+const CONTROL_UPDATE_MAX_MS = 30 * 60 * 1000;
+const CONTROL_REQUEST = "update-request.json";
+const CONTROL_STATE = "update-state.json";
+const RELEASE_VERSION = /^\d+\.\d+\.\d+$/;
 
 /** `1.26.60.1` > `1.26.52.3`, Stelle für Stelle als Zahl. Positiv, wenn `a` neuer ist. */
 export function compareVersions(a: string, b: string): number {
@@ -36,10 +46,46 @@ async function fetchLatestMinecraft(): Promise<string> {
   return version;
 }
 
+/** Ein Grund, der so in der Oberfläche stehen kann. */
+class CheckProblem extends Error {}
+
+const releaseSchema = z.object({
+  tag_name: z.string(),
+  body: z.string().nullish(),
+  published_at: z.string().nullish(),
+  assets: z.array(z.object({ name: z.string() }))
+});
+
+interface ControlRelease {
+  version: string;
+  notes: string | null;
+  publishedAt: string | null;
+}
+
+/** Neueste Version von Deep Mine Control: GitHub `releases/latest`, zählt nur mit Paket-Anhang. */
+async function fetchLatestControl(): Promise<ControlRelease> {
+  const { githubApi, updateRepo } = useRuntimeConfig();
+  const release = releaseSchema.parse(
+    await $fetch(`${githubApi}/repos/${updateRepo}/releases/latest`, {
+      timeout: 10_000,
+      headers: { Accept: "application/vnd.github+json", "User-Agent": "deep-mine-control" }
+    })
+  );
+  const version = release.tag_name.replace(/^v/, "");
+  if (!RELEASE_VERSION.test(version)) throw new Error(`Unbekannte Release-Bezeichnung: ${release.tag_name}`);
+  // Die Pipeline hängt das Paket erst ein paar Minuten nach dem Release an.
+  if (!release.assets.some((a) => a.name === `deep-mine-control_${version}_amd64.deb`))
+    throw new CheckProblem(
+      `Das neueste Release ${release.tag_name} hat noch kein Paket. Gleich noch einmal prüfen.`
+    );
+  return { version, notes: release.body?.trim() || null, publishedAt: release.published_at ?? null };
+}
+
 interface Check {
+  control: ControlRelease | null;
   minecraft: string | null;
   checkedAt: string;
-  error: string | null;
+  errors: Record<UpdateKind, string | null>;
 }
 
 let check: Check | null = null;
@@ -94,17 +140,29 @@ async function writeFailed(kind: UpdateKind, version: string | null): Promise<vo
   await writeFile(dataFile("updates.json"), JSON.stringify({ failed }) + "\n");
 }
 
-/** Fragt Mojang jetzt. Scheitert das (z. B. ohne Internet), ist die neueste Version unbekannt. */
+/** Grund für die Oberfläche; Unerwartetes landet im Log. */
+function checkError(source: string, error: unknown): string {
+  if (error instanceof CheckProblem) return error.message;
+  console.error(`Update-Prüfung bei ${source} fehlgeschlagen:`, error);
+  return `${source} ist nicht erreichbar. Hat der Server Internet?`;
+}
+
+/**
+ * Fragt GitHub und Mojang jetzt, unabhängig voneinander. Scheitert eine Prüfung (z. B. ohne Internet), ist
+ * nur dort die neueste Version unbekannt.
+ */
 export function checkNow(): Promise<void> {
   pendingCheck ??= (async () => {
     try {
-      check = { minecraft: await fetchLatestMinecraft(), checkedAt: new Date().toISOString(), error: null };
-    } catch (error) {
-      console.error("Update-Prüfung bei Mojang fehlgeschlagen:", error);
+      const [control, minecraft] = await Promise.allSettled([fetchLatestControl(), fetchLatestMinecraft()]);
       check = {
-        minecraft: null,
+        control: control.status === "fulfilled" ? control.value : null,
+        minecraft: minecraft.status === "fulfilled" ? minecraft.value : null,
         checkedAt: new Date().toISOString(),
-        error: "Mojang ist nicht erreichbar. Hat der Server Internet?"
+        errors: {
+          control: control.status === "rejected" ? checkError("GitHub", control.reason) : null,
+          minecraft: minecraft.status === "rejected" ? checkError("Mojang", minecraft.reason) : null
+        }
       };
     } finally {
       pendingCheck = null;
@@ -118,14 +176,72 @@ export async function ensureChecked(): Promise<void> {
   if (!check || Date.now() - Date.parse(check.checkedAt) > CHECK_MAX_AGE_MS) await checkNow();
 }
 
-/** Stand der Updates. Die installierte Minecraft-Version kommt jedes Mal frisch von BSM. */
+const controlStateSchema = z.object({
+  version: z.string().nullable().catch(null),
+  phase: z.enum(["downloading", "installing", "verifying", "done", "failed", "rolled-back"]),
+  error: z.string().nullable().catch(null),
+  startedAt: z.string().nullable().catch(null)
+});
+
+/**
+ * Stand des Control-Updates aus Anfrage- und Zustandsdatei. Eine frische Anfrage zählt schon als „wird
+ * geladen“. Gescheitert (auch zurückgesetzt oder unterbrochen) bleibt es, bis das nächste Update beginnt.
+ * Die gescheiterte Version kommt wie bei Minecraft nach updates.json, ein geglücktes Update löscht sie.
+ */
+async function readControlRun(): Promise<UpdateRun | null> {
+  const request = await stat(dataFile(CONTROL_REQUEST)).catch(() => null);
+  if (request && Date.now() - request.mtimeMs < CONTROL_REQUEST_MAX_AGE_MS)
+    return { kind: "control", phase: "downloading", error: null };
+
+  const state = await readStored(CONTROL_STATE, controlStateSchema.nullable(), null);
+  if (!state) return null;
+  let controlRun: UpdateRun | null = null;
+  if (state.phase === "downloading" || state.phase === "installing" || state.phase === "verifying") {
+    controlRun =
+      Date.now() - Date.parse(state.startedAt ?? "") < CONTROL_UPDATE_MAX_MS
+        ? { kind: "control", phase: state.phase, error: null }
+        : { kind: "control", phase: "failed", error: "Das Update wurde unterbrochen." };
+  } else if (state.phase !== "done") {
+    controlRun = { kind: "control", phase: "failed", error: state.error ?? "Das Update ist fehlgeschlagen." };
+  }
+
+  const failedVersion = controlRun?.phase === "failed" ? state.version : controlRun ? undefined : null;
+  if (failedVersion !== undefined && (await readFailed()).control !== failedVersion)
+    await writeFailed("control", failedVersion);
+  return controlRun;
+}
+
+const isActive = (r: UpdateRun | null) => !!r && r.phase !== "failed";
+
+/**
+ * Stand der Updates. Die installierte Minecraft-Version kommt jedes Mal frisch von BSM, die von Deep Mine
+ * Control aus der Versionsdatei.
+ */
 export async function readUpdates(): Promise<UpdatesInfo> {
-  const current = (await bsm.summary().catch(() => null))?.version || null;
+  const [summary, controlCurrent, controlRun] = await Promise.all([
+    bsm.summary().catch(() => null),
+    readVersion(),
+    readControlRun()
+  ]);
+  const current = summary?.version || null;
   const latest = check?.minecraft ?? null;
   const available = !!current && !!latest && compareVersions(latest, current) > 0;
+  const release = check?.control ?? null;
+  // Ohne Paket („dev“) gibt es kein Update per Knopf.
+  const controlAvailable =
+    !!release && RELEASE_VERSION.test(controlCurrent) && compareVersions(release.version, controlCurrent) > 0;
   const [failed, auto] = await Promise.all([readFailed(), readAutoUpdateSettings()]);
+  const errors = check?.errors ?? { control: null, minecraft: null };
   return {
     // Gemerkt wird nur, solange es um genau diese Version geht: Eine neuere hebt die Sperre auf.
+    control: {
+      current: controlCurrent,
+      latest: release?.version ?? null,
+      available: controlAvailable,
+      failed: controlAvailable && failed.control === release!.version ? release!.version : null,
+      notes: release?.notes ?? null,
+      publishedAt: release?.publishedAt ?? null
+    },
     minecraft: {
       current,
       latest,
@@ -133,15 +249,24 @@ export async function readUpdates(): Promise<UpdatesInfo> {
       failed: available && failed.minecraft === latest ? latest : null
     },
     checkedAt: check?.checkedAt ?? null,
-    error: check?.error ?? null,
-    running: run,
+    errors,
+    error: [errors.control, errors.minecraft].filter(Boolean).join(" ") || null,
+    running: [run, controlRun].find(isActive) ?? run ?? controlRun,
     auto
   };
 }
 
 /** Was gerade aktualisiert wird; ein gescheitertes Update zählt nicht mehr. */
-export function updatingNow(): UpdateKind | null {
-  return run && run.phase !== "failed" ? run.kind : null;
+export async function updatingNow(): Promise<UpdateKind | null> {
+  if (isActive(run)) return run!.kind;
+  return isActive(await readControlRun()) ? "control" : null;
+}
+
+/** Fragt beim root-Helfer das Update von Deep Mine Control auf `version` an. Der prüft selbst noch einmal. */
+export async function requestControlUpdate(version: string): Promise<string> {
+  const id = randomUUID();
+  await writeFile(dataFile(CONTROL_REQUEST), JSON.stringify({ id, version }) + "\n");
+  return id;
 }
 
 /**
@@ -169,26 +294,64 @@ export async function updateMinecraft(version: string): Promise<void> {
   await writeFailed("minecraft", null);
 }
 
+/** Lage für den Autoupdate-Lauf, einmal gelesen für beide Teile */
+interface AutoUpdateScene {
+  updates: UpdatesInfo;
+  /** `null`: BSM antwortet nicht, also unbekannt, ob jemand spielt */
+  players: number | null;
+  updating: UpdateKind | null;
+}
+
 /**
- * Autoupdate-Lauf (stündlich vom Timer deep-mine-update-check): prüft neu und startet das Minecraft-Update im
- * Hintergrund, wenn Autoupdate an ist, eine neuere Version da ist, die nicht schon gescheitert ist, niemand
- * spielt und kein Weltvorgang läuft. Antwortet sofort mit dem, was getan wurde, oder warum nicht.
+ * Warum Autoupdate `kind` jetzt nicht aktualisiert, `null`: es darf. Ohne await, damit zwischen der Prüfung
+ * auf Weltvorgänge und dem Start nichts dazwischenkommt.
+ */
+function autoUpdateSkip(
+  kind: UpdateKind,
+  { updates, players, updating }: AutoUpdateScene
+): AutoUpdateSkip | null {
+  const info = updates[kind];
+  if (!updates.auto[kind]) return "off";
+  if (updates.errors[kind] || !info.current) return "check-failed";
+  if (!info.available || !info.latest) return "up-to-date";
+  if (info.failed) return "failed";
+  if (players === null) return "check-failed";
+  if (players > 0) return "players-online";
+  if (updating) return "update-running";
+  if (isWorldOperationRunning()) return "world-operation";
+  return null;
+}
+
+/**
+ * Autoupdate-Lauf (stündlich vom Timer deep-mine-update-check): prüft neu und startet höchstens ein Update,
+ * erst Minecraft, dann Deep Mine Control (das startet die App neu). Jeweils nur, wenn Autoupdate dafür an ist,
+ * eine neuere Version da ist, die nicht schon gescheitert ist, niemand spielt und weder ein Update noch ein
+ * Weltvorgang läuft. Startet Minecraft, ist Deep Mine Control erst im nächsten Lauf dran: Dann sind alle
+ * Bedingungen frisch geprüft. Antwortet sofort mit dem, was getan wurde, und warum der Rest nicht.
  */
 export async function runAutoUpdate(): Promise<AutoUpdateResult> {
   await checkNow();
-  if (!(await readAutoUpdateSettings()).minecraft) return { action: "none", reason: "off" };
+  const [updates, summary, updating] = await Promise.all([
+    readUpdates(),
+    bsm.summary().catch(() => null),
+    updatingNow()
+  ]);
+  const scene: AutoUpdateScene = { updates, players: summary?.players.length ?? null, updating };
 
-  const { minecraft, error } = await readUpdates();
-  if (error || !minecraft.current) return { action: "none", reason: "check-failed" };
-  if (!minecraft.available || !minecraft.latest) return { action: "none", reason: "up-to-date" };
-  if (minecraft.failed) return { action: "none", reason: "failed" };
-  const summary = await bsm.summary().catch(() => null);
-  if (!summary) return { action: "none", reason: "check-failed" };
-  if (summary.players.length > 0) return { action: "none", reason: "players-online" };
-  // Direkt vor dem Start, ohne await dazwischen: Sonst könnte noch ein Weltvorgang dazwischenkommen.
-  if (isWorldOperationRunning()) return { action: "none", reason: "world-operation" };
+  const minecraft = autoUpdateSkip("minecraft", scene);
+  if (!minecraft) {
+    const version = updates.minecraft.latest!;
+    startWorldOperation(null, () => updateMinecraft(version));
+    return {
+      action: "minecraft",
+      version,
+      reasons: { control: autoUpdateSkip("control", { ...scene, updating: "minecraft" }) ?? "update-running" }
+    };
+  }
 
-  const version = minecraft.latest;
-  startWorldOperation(null, () => updateMinecraft(version));
-  return { action: "minecraft", version };
+  const control = autoUpdateSkip("control", scene);
+  if (control) return { action: "none", reasons: { minecraft, control } };
+  const version = updates.control.latest!;
+  await requestControlUpdate(version);
+  return { action: "control", version, reasons: { minecraft } };
 }
