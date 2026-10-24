@@ -1,7 +1,12 @@
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { z } from "zod";
 
 // Updates prüfen und ausführen. Das Ergebnis der Prüfung liegt nur im Speicher: Es wird beim ersten Abruf
 // geholt und, wenn es älter als eine Stunde ist, neu. „Jetzt prüfen“ holt es sofort.
+// Dauerhaft im Datenordner liegen die Autoupdate-Schalter (update-settings.json) und gescheiterte Versionen
+// (updates.json).
 
 const CHECK_MAX_AGE_MS = 60 * 60 * 1000;
 /** BSM stoppt, sichert, lädt und installiert: Das dauert deutlich länger als ein Backup. */
@@ -41,8 +46,53 @@ let check: Check | null = null;
 /** Laufende Prüfung, damit gleichzeitige Abrufe Mojang nur einmal fragen. */
 let pendingCheck: Promise<void> | null = null;
 let run: UpdateRun | null = null;
-/** Bis zum Neustart von Deep Mine Control. Autoupdate (später) merkt es sich dauerhaft. */
-let failedMinecraft: string | null = null;
+
+function dataFile(name: string) {
+  return join(useRuntimeConfig().dataDir, name);
+}
+
+/** Liest eine JSON-Datei aus dem Datenordner. Fehlt sie oder ist sie kaputt: `fallback`. */
+async function readStored<T>(name: string, schema: z.ZodType<T>, fallback: T): Promise<T> {
+  try {
+    return schema.parse(JSON.parse(await readFile(dataFile(name), "utf8")));
+  } catch {
+    return fallback;
+  }
+}
+
+const settingsSchema = z.object({ control: z.boolean().catch(false), minecraft: z.boolean().catch(false) });
+
+export function readAutoUpdateSettings(): Promise<AutoUpdateSettings> {
+  return readStored("update-settings.json", settingsSchema, { control: false, minecraft: false });
+}
+
+/** Setzt die angegebenen Schalter, die anderen bleiben. */
+export async function writeAutoUpdateSettings(
+  change: Partial<AutoUpdateSettings>
+): Promise<AutoUpdateSettings> {
+  const settings = { ...(await readAutoUpdateSettings()), ...change };
+  await writeFile(dataFile("update-settings.json"), JSON.stringify(settings) + "\n");
+  return settings;
+}
+
+/** Je Teil die Version, deren Update zuletzt gescheitert ist. */
+const failedSchema = z.object({
+  failed: z.object({
+    control: z.string().nullable().catch(null),
+    minecraft: z.string().nullable().catch(null)
+  })
+});
+type Failed = z.infer<typeof failedSchema>["failed"];
+
+async function readFailed(): Promise<Failed> {
+  return (await readStored("updates.json", failedSchema, { failed: { control: null, minecraft: null } }))
+    .failed;
+}
+
+async function writeFailed(kind: UpdateKind, version: string | null): Promise<void> {
+  const failed = { ...(await readFailed()), [kind]: version };
+  await writeFile(dataFile("updates.json"), JSON.stringify({ failed }) + "\n");
+}
 
 /** Fragt Mojang jetzt. Scheitert das (z. B. ohne Internet), ist die neueste Version unbekannt. */
 export function checkNow(): Promise<void> {
@@ -72,16 +122,20 @@ export async function ensureChecked(): Promise<void> {
 export async function readUpdates(): Promise<UpdatesInfo> {
   const current = (await bsm.summary().catch(() => null))?.version || null;
   const latest = check?.minecraft ?? null;
+  const available = !!current && !!latest && compareVersions(latest, current) > 0;
+  const [failed, auto] = await Promise.all([readFailed(), readAutoUpdateSettings()]);
   return {
+    // Gemerkt wird nur, solange es um genau diese Version geht: Eine neuere hebt die Sperre auf.
     minecraft: {
       current,
       latest,
-      available: !!current && !!latest && compareVersions(latest, current) > 0,
-      failed: failedMinecraft
+      available,
+      failed: available && failed.minecraft === latest ? latest : null
     },
     checkedAt: check?.checkedAt ?? null,
     error: check?.error ?? null,
-    running: run
+    running: run,
+    auto
   };
 }
 
@@ -102,15 +156,39 @@ export async function updateMinecraft(version: string): Promise<void> {
     run.phase = "updating";
     const { task_id } = await bsm.updateServer();
     await waitForTask(task_id, MINECRAFT_UPDATE_TIMEOUT_MS);
-    run = null;
-    failedMinecraft = null;
   } catch (error) {
     run = {
       kind: "minecraft",
       phase: "failed",
       error: error instanceof Error ? error.message : String(error)
     };
-    failedMinecraft = version;
+    await writeFailed("minecraft", version);
     throw error;
   }
+  run = null;
+  await writeFailed("minecraft", null);
+}
+
+/**
+ * Autoupdate-Lauf (stündlich vom Timer deep-mine-update-check): prüft neu und startet das Minecraft-Update im
+ * Hintergrund, wenn Autoupdate an ist, eine neuere Version da ist, die nicht schon gescheitert ist, niemand
+ * spielt und kein Weltvorgang läuft. Antwortet sofort mit dem, was getan wurde, oder warum nicht.
+ */
+export async function runAutoUpdate(): Promise<AutoUpdateResult> {
+  await checkNow();
+  if (!(await readAutoUpdateSettings()).minecraft) return { action: "none", reason: "off" };
+
+  const { minecraft, error } = await readUpdates();
+  if (error || !minecraft.current) return { action: "none", reason: "check-failed" };
+  if (!minecraft.available || !minecraft.latest) return { action: "none", reason: "up-to-date" };
+  if (minecraft.failed) return { action: "none", reason: "failed" };
+  const summary = await bsm.summary().catch(() => null);
+  if (!summary) return { action: "none", reason: "check-failed" };
+  if (summary.players.length > 0) return { action: "none", reason: "players-online" };
+  // Direkt vor dem Start, ohne await dazwischen: Sonst könnte noch ein Weltvorgang dazwischenkommen.
+  if (isWorldOperationRunning()) return { action: "none", reason: "world-operation" };
+
+  const version = minecraft.latest;
+  startWorldOperation(null, () => updateMinecraft(version));
+  return { action: "minecraft", version };
 }

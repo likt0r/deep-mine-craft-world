@@ -28,7 +28,8 @@ done
 
 for unit in bsm.service deep-mine-control.service deep-mine-backup-on-shutdown.service deep-mine-ethernet.path \
   deep-mine-ethernet.service deep-mine-smart.service deep-mine-smart.timer deep-mine-wifi-check.service \
-  deep-mine-wifi-check.timer caddy.service.d/deep-mine-control.conf; do
+  deep-mine-wifi-check.timer deep-mine-update-check.service deep-mine-update-check.timer \
+  caddy.service.d/deep-mine-control.conf; do
   has "/usr/lib/systemd/system/$unit"
 done
 

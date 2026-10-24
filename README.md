@@ -130,6 +130,15 @@ Das Passwort steht nur in `/etc/deep-mine-control.env` als `NUXT_BSM_PASSWORD=�
 Konto neu anlegen: in BSM unter Benutzer einen Registrierungslink erzeugen, damit `deep-mine-control`
 registrieren, Passwort in die Datei schreiben, `sudo systemctl restart deep-mine-control`.
 
+## Updates
+
+Unter System → Updates zeigt Deep Mine Control die installierte und die neueste Minecraft-Version (Mojang) und
+aktualisiert per Halten über BSM (stoppen, sichern, installieren, starten). **Autoupdate** (Schalter auf der Karte,
+Standard aus, `update-settings.json`): Der Timer `deep-mine-update-check` ruft stündlich (erstmals 10 Minuten
+nach dem Start) `POST /api/updates/auto` auf. Installiert wird nur, wenn niemand spielt und kein Weltvorgang läuft.
+Eine gescheiterte Version merkt sich `updates.json`; Autoupdate versucht sie nicht noch einmal, „Erneut versuchen“
+auf der Karte schon. Warum ein Lauf nichts getan hat: `journalctl -u deep-mine-update-check`.
+
 ## Paket bauen
 
 Deep Mine Control wird nicht mehr auf dem Server gebaut. Die Pipeline (`.github/workflows/package.yml`) baut bei jedem

@@ -58,6 +58,10 @@ contents:
     dst: /usr/lib/systemd/system/deep-mine-smart.service
   - src: server/deep-mine-smart.timer
     dst: /usr/lib/systemd/system/deep-mine-smart.timer
+  - src: server/deep-mine-update-check.service
+    dst: /usr/lib/systemd/system/deep-mine-update-check.service
+  - src: server/deep-mine-update-check.timer
+    dst: /usr/lib/systemd/system/deep-mine-update-check.timer
   - src: server/deep-mine-wifi-check.service
     dst: /usr/lib/systemd/system/deep-mine-wifi-check.service
   - src: server/deep-mine-wifi-check.timer

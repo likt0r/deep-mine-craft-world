@@ -1,7 +1,14 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { expect, test, type Page } from "@playwright/test";
 
 import { fake } from "./fake";
+import { E2E_APP_PORT } from "./ports";
 import { toast } from "./toast";
+
+const DATA = fileURLToPath(new URL(`../../.data/e2e-${E2E_APP_PORT}/deep-mine-control`, import.meta.url));
 
 const INSTALLED = "1.26.52.3";
 const NEWER = "1.26.60.1";
@@ -15,6 +22,16 @@ async function offer(page: Page, latest: string, mojangDown = false) {
 test.beforeEach(async () => {
   await fake.reset();
 });
+
+/** Hält den Knopf 3 s gedrückt. */
+async function hold(page: Page, testId: string) {
+  await page.getByTestId(testId).hover();
+  await page.mouse.down();
+  await page.waitForTimeout(3200);
+  await page.mouse.up();
+}
+
+const notBusy = async (page: Page) => !(await (await page.request.get("/api/status")).json()).busy;
 
 test("Tab Updates: Handy 2×2, Tablet in einer Reihe", async ({ page }, testInfo) => {
   await offer(page, INSTALLED);
@@ -71,10 +88,7 @@ test("Update per 3 s Halten: Statusleiste meldet es, danach ist die neue Version
   await fake.set({ startDelayMs: 2500 });
   await page.goto("/system/updates");
 
-  await page.getByTestId("updates-minecraft-update").hover();
-  await page.mouse.down();
-  await page.waitForTimeout(3200);
-  await page.mouse.up();
+  await hold(page, "updates-minecraft-update");
 
   await expect(toast(page, "Minecraft wird aktualisiert …")).toBeVisible();
   const bar = page.getByTestId("status-bar");
@@ -86,4 +100,57 @@ test("Update per 3 s Halten: Statusleiste meldet es, danach ist die neue Version
   await expect(page.getByTestId("updates-minecraft-uptodate")).toBeVisible();
   await expect(bar).toHaveAttribute("data-state", "running", { timeout: 5000 });
   expect((await fake.get()).calls.filter((c) => c.path.endsWith("/update"))).toHaveLength(1);
+});
+
+test("Autoupdate-Schalter: an zeigt den Hinweis statt des Knopfs, aus wieder den Knopf", async ({ page }) => {
+  await offer(page, NEWER);
+  await page.goto("/system/updates");
+  const auto = page.getByTestId("update-auto-minecraft");
+  await expect(auto).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByTestId("updates-minecraft-update")).toBeVisible();
+  await expect(page.getByTestId("updates-minecraft-auto-hint")).toBeHidden();
+
+  await auto.click();
+
+  await expect(toast(page, "Minecraft wird automatisch aktualisiert.")).toBeVisible();
+  await expect(auto).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("updates-minecraft-auto-hint")).toHaveText(
+    "Wird automatisch installiert, sobald niemand spielt."
+  );
+  await expect(page.getByTestId("updates-minecraft-update")).toBeHidden();
+  expect(JSON.parse(readFileSync(join(DATA, "update-settings.json"), "utf8"))).toEqual({
+    control: false,
+    minecraft: true
+  });
+
+  await auto.click();
+
+  await expect(toast(page, "Minecraft wird nicht mehr automatisch aktualisiert.")).toBeVisible();
+  await expect(auto).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByTestId("updates-minecraft-update")).toBeVisible();
+});
+
+test("Autoupdate an, aber die Version ist gescheitert: Grund und „Erneut versuchen“", async ({ page }) => {
+  await page.request.put("/api/updates/auto", { data: { minecraft: true } });
+  await offer(page, NEWER);
+  await fake.set({ tasksFail: true });
+  await page.request.post("/api/updates/auto");
+  await expect.poll(() => notBusy(page)).toBe(true);
+  await fake.set({ tasksFail: false });
+
+  await page.goto("/system/updates");
+
+  await expect(page.getByTestId("updates-minecraft-failed")).toContainText(
+    `Update auf ${NEWER} ist fehlgeschlagen`
+  );
+  await expect(page.getByTestId("updates-minecraft-failed")).toContainText("Fehler im Fake");
+  await expect(page.getByTestId("updates-minecraft-auto-hint")).toBeHidden();
+  await expect(page.getByTestId("updates-minecraft-update")).toContainText("Erneut versuchen");
+
+  await hold(page, "updates-minecraft-update");
+
+  await expect(toast(page, "Minecraft wird aktualisiert …")).toBeVisible();
+  await expect(page.getByTestId("updates-minecraft-current")).toHaveText(NEWER, { timeout: 10_000 });
+  await expect(page.getByTestId("updates-minecraft-failed")).toBeHidden();
+  await expect(page.getByTestId("updates-minecraft-uptodate")).toBeVisible();
 });

@@ -1,3 +1,6 @@
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { startHarness, type ControlHarness } from "../support/app";
@@ -22,6 +25,7 @@ beforeEach(async () => {
   await offer(INSTALLED);
 });
 
+const readJson = (name: string) => JSON.parse(readFileSync(join(h.fixture.dataDir, name), "utf8"));
 const status = async () => (await h.request("/api/status")).body;
 const notBusy = async () => (await status()).busy;
 const updateCalls = () => h.fake.calls.filter((c) => c.method === "POST" && c.path.endsWith("/update"));
@@ -37,7 +41,8 @@ describe("GET /api/updates", () => {
       minecraft: { current: INSTALLED, latest: NEWER, available: true, failed: null },
       checkedAt: expect.any(String),
       error: null,
-      running: null
+      running: null,
+      auto: { control: false, minecraft: false }
     });
     expect(Date.now() - Date.parse(res.body.checkedAt)).toBeLessThan(10_000);
   });
@@ -162,6 +167,7 @@ describe("POST /api/updates/minecraft", () => {
     });
     expect(res.body.minecraft).toMatchObject({ current: INSTALLED, available: true, failed: NEWER });
     expect((await status()).updating).toBeNull();
+    expect(readJson("updates.json")).toEqual({ failed: { control: null, minecraft: NEWER } });
 
     // Erneut versuchen klappt und räumt den Fehler weg.
     h.fake.state.tasksFail = false;
@@ -171,5 +177,159 @@ describe("POST /api/updates/minecraft", () => {
       minecraft: { current: NEWER, failed: null },
       running: null
     });
+    expect(readJson("updates.json")).toEqual({ failed: { control: null, minecraft: null } });
+  });
+});
+
+describe("PUT /api/updates/auto", () => {
+  it("ohne Datei: Autoupdate aus", async () => {
+    expect(existsSync(join(h.fixture.dataDir, "update-settings.json"))).toBe(false);
+    expect((await h.request("/api/updates")).body.auto).toEqual({ control: false, minecraft: false });
+  });
+
+  it("setzt einen Schalter, die anderen bleiben; dauerhaft im Datenordner", async () => {
+    const on = await h.request("/api/updates/auto", { method: "PUT", body: { minecraft: true } });
+
+    expect(on.status).toBe(200);
+    expect(on.body).toEqual({ control: false, minecraft: true });
+    expect(readJson("update-settings.json")).toEqual({ control: false, minecraft: true });
+    expect((await h.request("/api/updates")).body.auto).toEqual({ control: false, minecraft: true });
+
+    await h.request("/api/updates/auto", { method: "PUT", body: { control: true } });
+    expect(readJson("update-settings.json")).toEqual({ control: true, minecraft: true });
+
+    await h.request("/api/updates/auto", { method: "PUT", body: { minecraft: false } });
+    expect((await h.request("/api/updates")).body.auto).toEqual({ control: true, minecraft: false });
+  });
+
+  it.each([
+    ["leer", {}],
+    ["kein Wahrheitswert", { minecraft: "ja" }],
+    ["unbekannter Schalter", { minecraft: true, bsm: true }],
+    ["kein Objekt", "an"]
+  ])("ungültig (%s): 400, nichts gespeichert", async (_, body) => {
+    const res = await h.request("/api/updates/auto", { method: "PUT", body });
+
+    expect(res.status).toBe(400);
+    expect(existsSync(join(h.fixture.dataDir, "update-settings.json"))).toBe(false);
+  });
+});
+
+describe("POST /api/updates/auto", () => {
+  const autoRun = async () => {
+    const res = await h.request("/api/updates/auto", { method: "POST" });
+    expect(res.status).toBe(200);
+    return res.body;
+  };
+  const autoOn = () => h.request("/api/updates/auto", { method: "PUT", body: { minecraft: true } });
+
+  it("Autoupdate aus: prüft trotzdem, installiert aber nichts", async () => {
+    h.fake.state.latestVersion = NEWER;
+
+    expect(await autoRun()).toEqual({ action: "none", reason: "off" });
+
+    expect((await h.request("/api/updates")).body.minecraft).toMatchObject({
+      latest: NEWER,
+      available: true
+    });
+    expect(updateCalls()).toEqual([]);
+  });
+
+  it("an und niemand online: prüft neu und startet das Update im Hintergrund", async () => {
+    await autoOn();
+    h.fake.state.latestVersion = NEWER;
+    h.fake.state.startDelayMs = 500;
+
+    expect(await autoRun()).toEqual({ action: "minecraft", version: NEWER });
+
+    expect(await status()).toMatchObject({ busy: true, updating: "minecraft" });
+    await expect.poll(notBusy).toBe(false);
+    expect(updateCalls()).toHaveLength(1);
+    expect(h.fake.commands()).toEqual([]);
+    expect((await h.request("/api/updates")).body.minecraft).toMatchObject({
+      current: NEWER,
+      available: false
+    });
+  });
+
+  it("an, aber nichts neu: nichts", async () => {
+    await autoOn();
+
+    expect(await autoRun()).toEqual({ action: "none", reason: "up-to-date" });
+    expect(updateCalls()).toEqual([]);
+  });
+
+  it("an, aber Mojang nicht erreichbar: nichts, mit eigenem Grund", async () => {
+    await autoOn();
+    h.fake.state.mojangDown = true;
+
+    expect(await autoRun()).toEqual({ action: "none", reason: "check-failed" });
+    expect(updateCalls()).toEqual([]);
+  });
+
+  it("an, aber jemand spielt: nichts, auch kein Countdown", async () => {
+    await autoOn();
+    await offer(NEWER);
+    h.fake.state.players = ["Lena"];
+
+    expect(await autoRun()).toEqual({ action: "none", reason: "players-online" });
+    expect(updateCalls()).toEqual([]);
+    expect(h.fake.commands()).toEqual([]);
+  });
+
+  it("an, aber ein Weltvorgang läuft: nichts", async () => {
+    await h.request("/api/places");
+    h.fixture.seedPlace(2, { name: "Bauwelt", folder: "w-bauwelt" });
+    await autoOn();
+    await offer(NEWER);
+    h.fake.state.startDelayMs = 500;
+    await h.request("/api/places/2/load", { method: "POST" });
+
+    expect(await autoRun()).toEqual({ action: "none", reason: "world-operation" });
+
+    await expect.poll(notBusy).toBe(false);
+    expect(updateCalls()).toEqual([]);
+  });
+
+  it("gescheiterte Version: übersprungen, der Knopf versucht es trotzdem; eine neuere hebt die Sperre auf", async () => {
+    await autoOn();
+    await offer(NEWER);
+    h.fake.state.tasksFail = true;
+    expect(await autoRun()).toEqual({ action: "minecraft", version: NEWER });
+    await expect.poll(notBusy).toBe(false);
+    expect((await h.request("/api/updates")).body.minecraft.failed).toBe(NEWER);
+
+    h.fake.state.tasksFail = false;
+    expect(await autoRun()).toEqual({ action: "none", reason: "failed" });
+    expect(updateCalls()).toHaveLength(1);
+
+    // Eine noch neuere Version versucht Autoupdate wieder.
+    h.fake.state.latestVersion = "1.26.70.2";
+    expect(await autoRun()).toEqual({ action: "minecraft", version: "1.26.70.2" });
+    await expect.poll(notBusy).toBe(false);
+    expect(updateCalls()).toHaveLength(2);
+    expect((await h.request("/api/updates")).body.minecraft).toMatchObject({
+      current: "1.26.70.2",
+      failed: null
+    });
+  });
+
+  it("gescheiterte Version, gemerkt im Datenordner: Autoupdate überspringt, „Erneut versuchen“ geht", async () => {
+    writeFileSync(
+      join(h.fixture.dataDir, "updates.json"),
+      JSON.stringify({ failed: { control: null, minecraft: NEWER } })
+    );
+    await autoOn();
+    await offer(NEWER);
+
+    expect((await h.request("/api/updates")).body.minecraft.failed).toBe(NEWER);
+    expect(await autoRun()).toEqual({ action: "none", reason: "failed" });
+    expect(updateCalls()).toEqual([]);
+
+    expect((await h.request("/api/updates/minecraft", { method: "POST" })).status).toBe(200);
+    await expect.poll(notBusy).toBe(false);
+    expect(updateCalls()).toHaveLength(1);
+    expect((await h.request("/api/updates")).body.minecraft).toMatchObject({ current: NEWER, failed: null });
+    expect(readJson("updates.json")).toEqual({ failed: { control: null, minecraft: null } });
   });
 });

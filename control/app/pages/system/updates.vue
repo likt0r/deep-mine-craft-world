@@ -34,6 +34,26 @@ async function checkNow() {
   }
 }
 
+const switchingAuto = ref(false);
+async function setAutoMinecraft(minecraft: boolean) {
+  switchingAuto.value = true;
+  try {
+    await $fetch("/api/updates/auto", { method: "PUT", body: { minecraft } });
+    feedback.done(
+      minecraft
+        ? "Minecraft wird automatisch aktualisiert."
+        : "Minecraft wird nicht mehr automatisch aktualisiert."
+    );
+    await refresh();
+  } catch {
+    feedback.failed();
+  } finally {
+    switchingAuto.value = false;
+  }
+}
+/** Bei Autoupdate gibt es statt des Knopfs einen Hinweis. Eine gescheiterte Version versucht nur der Knopf erneut. */
+const showUpdateButton = computed(() => !info.value?.auto.minecraft || !!minecraft.value?.failed);
+
 async function updateMinecraft() {
   try {
     await $fetch("/api/updates/minecraft", { method: "POST" });
@@ -89,39 +109,53 @@ async function updateMinecraft() {
 
       <template v-else-if="minecraft?.available">
         <UAlert
-          v-if="run?.phase === 'failed'"
+          v-if="minecraft.failed"
           color="error"
           variant="subtle"
           icon="i-lucide-circle-alert"
-          :title="`Update auf ${minecraft.failed ?? minecraft.latest} ist fehlgeschlagen`"
-          :description="run.error ?? undefined"
+          :title="`Update auf ${minecraft.failed} ist fehlgeschlagen`"
+          :description="
+            info?.auto.minecraft
+              ? `${run?.error ? run.error + ' ' : ''}Automatisch wird es nicht noch einmal versucht.`
+              : (run?.error ?? undefined)
+          "
           data-testid="updates-minecraft-failed"
         />
         <p class="text-toned" data-testid="updates-minecraft-available">
           <strong class="text-highlighted">Version {{ minecraft.latest }}</strong> ist da. Tablets und
           Konsolen mit neuem Minecraft können sonst bald nicht mehr beitreten.
         </p>
-        <p class="text-sm text-muted">
-          Minecraft stoppt dafür, BSM sichert alles und startet den Server neu.
-          <template v-if="players > 0">
-            {{
-              players === 1
-                ? "1 Spieler ist online und bekommt"
-                : `${players} Spieler sind online und bekommen`
-            }}
-            10 Sekunden Countdown im Chat.
-          </template>
-          Alle werden kurz getrennt.
+        <p
+          v-if="!showUpdateButton"
+          class="flex items-center gap-2 font-semibold text-highlighted"
+          data-testid="updates-minecraft-auto-hint"
+        >
+          <UIcon name="i-lucide-clock" class="size-5 shrink-0" />
+          Wird automatisch installiert, sobald niemand spielt.
         </p>
-        <HoldButton
-          :label="run?.phase === 'failed' ? 'Erneut versuchen' : 'Jetzt aktualisieren'"
-          icon="i-lucide-download"
-          color="warning"
-          :disabled="updateLocked"
-          data-testid="updates-minecraft-update"
-          @confirm="updateMinecraft"
-        />
-        <p class="text-center text-sm text-muted">3 Sekunden gedrückt halten.</p>
+        <template v-else>
+          <p class="text-sm text-muted">
+            Minecraft stoppt dafür, BSM sichert alles und startet den Server neu.
+            <template v-if="players > 0">
+              {{
+                players === 1
+                  ? "1 Spieler ist online und bekommt"
+                  : `${players} Spieler sind online und bekommen`
+              }}
+              10 Sekunden Countdown im Chat.
+            </template>
+            Alle werden kurz getrennt.
+          </p>
+          <HoldButton
+            :label="minecraft.failed ? 'Erneut versuchen' : 'Jetzt aktualisieren'"
+            icon="i-lucide-download"
+            color="warning"
+            :disabled="updateLocked"
+            data-testid="updates-minecraft-update"
+            @confirm="updateMinecraft"
+          />
+          <p class="text-center text-sm text-muted">3 Sekunden gedrückt halten.</p>
+        </template>
       </template>
 
       <p
@@ -131,6 +165,22 @@ async function updateMinecraft() {
       >
         <UIcon name="i-lucide-circle-check" class="size-5" />
         Minecraft ist aktuell.
+      </p>
+
+      <div class="flex items-center gap-3 border-t border-default pt-3">
+        <span id="auto-minecraft-label" class="flex-1 font-semibold">Automatisch aktualisieren</span>
+        <USwitch
+          size="xl"
+          aria-labelledby="auto-minecraft-label"
+          :modelValue="info?.auto.minecraft ?? false"
+          :loading="switchingAuto"
+          :disabled="switchingAuto || !info"
+          data-testid="update-auto-minecraft"
+          @update:modelValue="setAutoMinecraft"
+        />
+      </div>
+      <p class="text-sm text-muted">
+        Jede Stunde wird geprüft. Ein neues Minecraft wird nur installiert, wenn gerade niemand spielt.
       </p>
 
       <UButton
