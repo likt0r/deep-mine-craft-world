@@ -23,7 +23,7 @@ Die App liegt in `control/` (Nuxt 4, Nuxt UI 4). Begriffe stehen in `CONTEXT.md`
 - `npm run lint`, `npm run typecheck`
 - Paket: `packaging/build-deb.sh [--no-build] X.Y.Z` und `packaging/check-deb.sh dist/….deb` (aus dem Repo-Wurzelordner). Neue Dateien für den Server kommen nach `server/` und in `packaging/nfpm.yaml`; Einrichtungsschritte in `packaging/postinst` (idempotent).
 
-Jeder PR und jeder Push auf `main` läuft durch die CI-Pipeline (Job `check`): Lint, Typecheck, API-Tests und Seitentests. Gemergt wird nur grün.
+Jeder PR und jeder Push auf `main` läuft durch die CI-Pipeline (Job `check`): Lint, Typecheck, API-Tests und Seitentests. Gemergt wird nur grün. Ausgerollt wird über ein Release: `gh workflow run release -f increment=patch|minor|major` (release-it, Tag `vX.Y.Z`, Paket am Release).
 
 Die Tests laufen gegen ein nachgebautes BSM (`test/support/fake-bsm.ts`) und temporäre Server-Ordner (`test/support/fixture.ts`). Braucht ein neues Feature eine weitere BSM-Route, wird sie dort ergänzt, mit derselben Antwortform wie das echte BSM 4.0.1.
 

@@ -158,10 +158,17 @@ Beim Entfernen bleiben Welten, Backups, `/var/lib/bsm` und `/etc/deep-mine-contr
 
 ## Aktualisieren
 
-Ausgerollt wird künftig über GitHub-Releases: Das Paket hängt mit `.deb.sha256` am Release, der Server lädt und
-installiert es (Release-Weg und Updates aus Deep Mine Control folgen mit #61). Es gibt bewusst kein apt-Repository
-(siehe [ADR 0002](docs/adr/0002-paket-in-der-pipeline-bauen-ohne-apt-repository.md)). Bis dahin von Hand:
-Paket aus dem Artefakt des Workflows „Paket“ laden (oder lokal bauen) und auf dem Server
+Ausgerollt wird über GitHub-Releases. Ein Release löst der Workflow „Release“ aus (auf GitHub unter Actions
+oder auf dem Laptop):
+
+```sh
+gh workflow run release -f increment=patch   # Fehlerkorrektur; minor: neue Funktion, major: großer Umbau
+```
+
+release-it zählt die Version aus dem letzten Tag hoch, setzt den Tag `vX.Y.Z` und legt das Release mit den Titeln
+der gemergten PRs an. Es gibt keinen Versions-Commit, main bleibt geschützt. Danach baut der Workflow das Paket aus
+genau diesem Tag und hängt `.deb` und `.deb.sha256` ans Release. Es gibt bewusst kein apt-Repository
+(siehe [ADR 0002](docs/adr/0002-paket-in-der-pipeline-bauen-ohne-apt-repository.md)). Von Hand auf dem Server:
 
 ```sh
 sudo apt-get install ./deep-mine-control_X.Y.Z_amd64.deb
