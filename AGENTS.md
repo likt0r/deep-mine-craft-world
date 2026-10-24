@@ -22,6 +22,8 @@ Die App liegt in `control/` (Nuxt 4, Nuxt UI 4). Begriffe stehen in `CONTEXT.md`
 - `npm run test:e2e`: baut die App und führt die Seitentests aus (Playwright, `test/e2e/`, Handy und Tablet)
 - `npm run lint`, `npm run typecheck`
 
+Jeder PR und jeder Push auf `main` läuft durch die CI-Pipeline (Job `check`): Lint, Typecheck, API-Tests und Seitentests. Gemergt wird nur grün.
+
 Die Tests laufen gegen ein nachgebautes BSM (`test/support/fake-bsm.ts`) und temporäre Server-Ordner (`test/support/fixture.ts`). Braucht ein neues Feature eine weitere BSM-Route, wird sie dort ergänzt, mit derselben Antwortform wie das echte BSM 4.0.1.
 
 Regeln:
